@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# ============================================================
+# pre-commit 钩子：提交前自动校验
+# 检查项：
+#   1. Shell 脚本语法（bash -n）+ shellcheck（若可用）
+#   2. YAML 文件可解析（python3 yaml.safe_load）
+#   3. 脚本文件具备可执行权限
+#   4. 疑似密钥/凭据泄露扫描
+#   5. Playbook 语法（ansible-playbook --syntax-check，若可用）
+# 遵循 AGENTS.md 测试指南与安全提示
+# ============================================================
+set -euo pipefail
+
+# 钩子可能不在仓库根执行，自动定位仓库顶层
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# 仅校验本次暂存(staged)的文件
+STAGED="$(git diff --cached --name-only --diff-filter=ACM)"
+[ -z "$STAGED" ] && exit 0
+
+FAIL=0
+warn() { printf "\033[31m[FAIL]\033[0m %s\n" "$*" >&2; }
+info() { printf "\033[36m[CHECK]\033[0m %s\n" "$*" >&2; }
+
+# ---------- 1. Shell 校验 ----------
+shell_files="$(printf '%s\n' "$STAGED" | grep -E '\.(sh)$' || true)"
+if [ -n "$shell_files" ]; then
+  info "Shell 脚本语法检查"
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    if ! bash -n "$f"; then
+      warn "语法错误：$f"
+      FAIL=1
+    fi
+    if command -v shellcheck >/dev/null 2>&1; then
+      if ! shellcheck -S warning "$f" >/dev/null 2>&1; then
+        warn "shellcheck 发现问题（severity>=warning）：$f，请运行 shellcheck $f 查看"
+        FAIL=1
+      fi
+    fi
+  done <<< "$shell_files"
+fi
+
+# ---------- 2. YAML 校验 ----------
+yaml_files="$(printf '%s\n' "$STAGED" | grep -E '\.(ya?ml)$' || true)"
+if [ -n "$yaml_files" ]; then
+  info "YAML 文件解析检查（yaml.safe_load）"
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    if ! python3 -c "import sys,yaml; yaml.safe_load(open(sys.argv[1]))" "$f" 2>/dev/null; then
+      warn "YAML 解析失败：$f"
+      FAIL=1
+    fi
+  done <<< "$yaml_files"
+fi
+
+# ---------- 3. 脚本可执行权限 ----------
+if [ -n "$shell_files" ]; then
+  info "脚本可执行权限检查"
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    if [ -f "$f" ] && ! [ -x "$f" ]; then
+      warn "脚本缺少可执行权限：$f（请 chmod +x $f）"
+      FAIL=1
+    fi
+  done <<< "$shell_files"
+fi
+
+# ---------- 4. 密钥/凭据泄露扫描 ----------
+info "疑似密钥/凭据泄露扫描"
+# 私钥头、常见 token 模式、占位真实密码
+LEAK_PATTERNS='(BEGIN (RSA |OPENSSH |DSA |EC |)PRIVATE KEY|api[_-]?key\s*[:=]\s*['"'"'"][A-Za-z0-9]{20,}|password\s*[:=]\s*['"'"'"][^'"'"'"]{6,}['"'"'"])'
+leak_hit="$(printf '%s\n' "$STAGED" | while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] || continue
+  # 跳过本钩子自身与 .gitignore
+  case "$f" in hooks/*|.gitignore) continue;; esac
+  if grep -nE "$LEAK_PATTERNS" "$f" 2>/dev/null; then
+    echo "$f"
+  fi
+done)"
+if [ -n "$leak_hit" ]; then
+  warn "检测到疑似密钥/凭据，请确认是否为占位符："
+  printf '%s\n' "$leak_hit" >&2
+  FAIL=1
+fi
+
+# ---------- 5. Playbook 语法检查 ----------
+if [ -n "$yaml_files" ] && command -v ansible-playbook >/dev/null 2>&1; then
+  info "Ansible Playbook 语法检查"
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    # 仅校验 playbooks/ 下的 .yml/.yaml
+    case "$f" in playbooks/*.yml|playbooks/*.yaml)
+      if ! ansible-playbook "$f" --syntax-check >/dev/null 2>&1; then
+        warn "Playbook 语法错误：$f"
+        FAIL=1
+      fi
+    ;; esac
+  done <<< "$yaml_files"
+fi
+
+if [ "$FAIL" -ne 0 ]; then
+  warn "提交已中止：请修复上述问题后重新提交（可用 git commit --no-verify 跳过，但不推荐）"
+  exit 1
+fi
+
+info "全部校验通过 ✓"
+exit 0
