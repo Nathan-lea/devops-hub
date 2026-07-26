@@ -1,0 +1,27 @@
+# Grafana 数据源自动配置
+apiVersion: 1
+
+datasources:
+  # Prometheus - 指标数据
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+
+  # Loki - 日志数据
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 5000
+
+  # VictoriaMetrics - 长期指标
+  - name: VictoriaMetrics
+    type: prometheus
+    access: proxy
+    url: http://victoriametrics:8428
+    editable: false

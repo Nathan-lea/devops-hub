@@ -1,0 +1,30 @@
+# K8s Pod 安全标准
+# 生产命名空间强制 restricted 级别
+
+---
+# 给命名空间打标签，启用 Pod 安全准入
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+  labels:
+    # enforced（强制）restricted 级别
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    # audit（审计）restricted 级别
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    # warn（警告）restricted 级别
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: staging
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest

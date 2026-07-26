@@ -1,0 +1,256 @@
+# ============================================================
+# 运维监控平台 Docker Compose
+# 一键部署：Prometheus + Grafana + Loki + Alertmanager + VictoriaMetrics
+# 部署在监控服务器（推荐 8C16G + 500G SSD）
+# 使用：docker compose up -d
+# ============================================================
+
+version: "3.8"
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  alertmanager_data:
+  vm_data:
+
+services:
+  # ============ Prometheus（主） ============
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=400GB"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============ Alertmanager ============
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============ Grafana ============
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASS:-ChangeMe!}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel, grafana-clock-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============ Loki（日志存储） ============
+  loki:
+    image: grafana/loki:2.9.5
+    container_name: loki
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============ VictoriaMetrics（长期存储） ============
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.102.0
+    container_name: victoriametrics
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm_data:/storage
+    command:
+      - "-storageDataPath=/storage"
+      - "-retentionPeriod=90d"
+      - "-httpListenAddr=:8428"
+      - "-memory.allowedPercent=60"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============ Blackbox Exporter（探活） ============
+  blackbox_exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: blackbox_exporter
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - "--config.file=/etc/blackbox_exporter/config.yml"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ============ Pushgateway（临时任务指标） ============
+  pushgateway:
+    image: prom/pushgateway:v1.7.0
+    container_name: pushgateway
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "9091:9091"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ============ Node Exporter（本机） ============
+  node_exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: node_exporter
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "9100:9100"
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - /var/lib/node_exporter/textfile:/textfile:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.textfile.directory=/textfile"
+      - "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)"
+      - "--no-collector.timex"
+
+  # ============ Wazuh Server（主机入侵检测 HIDS） ============
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.7.0
+    container_name: wazuh-manager
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "1514:1514"     # Agent 数据
+      - "1515:1515"     # Agent 注册
+      - "514:514/udp"   # Syslog
+      - "55000:55000"   # API
+    environment:
+      INDEXER_URL: "https://wazuh-indexer:9200"
+      FILEBEAT_SSL_VERIFICATION_MODE: "none"
+    volumes:
+      - wazuh_manager_data:/var/ossec/data
+      - ./wazuh/ossec.conf:/wazuh-config-mount/etc/ossec.conf
+    depends_on:
+      - wazuh-indexer
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============ Wazuh Indexer（安全日志存储） ============
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.7.0
+    container_name: wazuh-indexer
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "9200:9200"
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - "bootstrap.memory_lock=true"
+      - "discovery.type=single-node"
+      - "plugins.security.ssl.http.enabled=false"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - wazuh_indexer_data:/var/lib/wazuh-indexer
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============ Wazuh Dashboard（安全看板） ============
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.7.0
+    container_name: wazuh-dashboard
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "5601:5601"
+    environment:
+      INDEXER_URL: "https://wazuh-indexer:9200"
+      WAZUH_API_URL: "https://wazuh-manager:55000"
+      DASHBOARD_USERNAME: "admin"
+      DASHBOARD_PASSWORD: "${WAZUH_DASHBOARD_PASS:-ChangeMe!}"
+    depends_on:
+      - wazuh-indexer
+      - wazuh-manager
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes_extra:
+  wazuh_manager_data:
+  wazuh_indexer_data:

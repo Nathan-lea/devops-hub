@@ -1,0 +1,62 @@
+# 网络探活告警规则
+groups:
+  - name: network_alerts
+    rules:
+      # 端口不可达
+      - alert: PortUnreachable
+        expr: probe_success{job="blackbox_tcp"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "端口不可达: {{ $labels.instance }}"
+          description: "TCP 探活失败超过 1 分钟"
+
+      # HTTP 不可用
+      - alert: HttpEndpointDown
+        expr: probe_success{job="blackbox_http"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HTTP 不可用: {{ $labels.instance }}"
+
+      # HTTP 响应慢
+      - alert: HttpSlowResponse
+        expr: probe_duration_seconds{job="blackbox_http"} > 2
+        for: 5m
+        labels:
+          severity: minor
+        annotations:
+          summary: "HTTP 响应慢: {{ $labels.instance }}"
+          description: "响应时间 {{ $value }}s"
+
+      # ICMP 不可达
+      - alert: HostUnreachable
+        expr: probe_success{job="blackbox_icmp"} == 0
+        for: 2m
+        labels:
+          severity: major
+        annotations:
+          summary: "主机不可达: {{ $labels.instance }}"
+
+      # TLS 证书即将过期（30天）
+      - alert: TlsCertExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "证书即将过期: {{ $labels.instance }}"
+          description: "证书将在 {{ $value | humanizeDuration }} 后过期"
+
+      # TLS 证书即将过期（7天）
+      - alert: TlsCertExpiringCritical
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "证书即将过期（紧急）: {{ $labels.instance }}"
+          description: "证书将在 7 天内过期"

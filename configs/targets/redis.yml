@@ -1,0 +1,7 @@
+- targets:
+    - 10.0.5.10:9121
+    - 10.0.5.11:9121
+    - 10.0.5.12:9121
+  labels:
+    role: redis
+    env: production

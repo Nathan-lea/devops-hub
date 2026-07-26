@@ -1,0 +1,70 @@
+# Redis 告警规则
+groups:
+  - name: redis_alerts
+    rules:
+      # Redis 宕机
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "Redis {{ $labels.host }} 宕机"
+
+      # 内存使用过高
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 2m
+        labels:
+          severity: major
+        annotations:
+          summary: "Redis {{ $labels.host }} 内存使用过高"
+          description: "内存使用 > 85%，当前 {{ $value | humanizePercentage }}"
+
+      # 内存碎片率高
+      - alert: RedisMemFragmentation
+        expr: redis_memory_fragmentation_ratio > 1.5
+        for: 5m
+        labels:
+          severity: minor
+        annotations:
+          summary: "Redis {{ $labels.host }} 内存碎片率高"
+          description: "碎片率 > 1.5，考虑 activedefrag"
+
+      # 连接数过高
+      - alert: RedisTooManyConnections
+        expr: redis_connected_clients > 8000
+        for: 2m
+        labels:
+          severity: major
+        annotations:
+          summary: "Redis {{ $labels.host }} 连接数过高"
+          description: "当前连接数 {{ $value }}"
+
+      # 主从断开
+      - alert: RedisReplicationBroken
+        expr: redis_replication_master_link_status == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis {{ $labels.host }} 主从断开"
+
+      # 持久化失败
+      - alert: RedisRdbSaveFailed
+        expr: redis_rdb_last_bgsave_status != 0
+        labels:
+          severity: major
+        annotations:
+          summary: "Redis {{ $labels.host }} RDB 持久化失败"
+
+      # 命中率低
+      - alert: RedisLowHitRate
+        expr: redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total) < 0.9
+        for: 10m
+        labels:
+          severity: minor
+        annotations:
+          summary: "Redis {{ $labels.host }} 缓存命中率低"
+          description: "命中率 < 90%"

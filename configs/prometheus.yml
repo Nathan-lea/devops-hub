@@ -1,0 +1,167 @@
+# Prometheus 主配置文件
+# 适用于 100 台左右 Linux 主机 + MySQL/TiDB/Redis/K8s 环境
+
+global:
+  scrape_interval: 15s          # 默认采集间隔
+  evaluation_interval: 15s      # 规则评估间隔
+  scrape_timeout: 10s           # 采集超时
+  external_labels:
+    cluster: "prod"
+    env: "production"
+
+# 告警规则文件
+rule_files:
+  - "rules/host.yml"
+  - "rules/mysql.yml"
+  - "rules/redis.yml"
+  - "rules/k8s.yml"
+  - "rules/network.yml"
+  - "rules/security.yml"
+
+# 告警推送
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "10.0.0.10:9093"   # Alertmanager 地址
+
+# 抓取配置
+scrape_configs:
+  # ============ Prometheus 自身 ============
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ============ Linux 主机 (node_exporter) ============
+  - job_name: "node"
+    file_sd_configs:
+      - files: ["targets/nodes.yml"]
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: host
+        regex: "([^:]+):.*"
+        replacement: "$1"
+
+  # ============ MySQL ============
+  - job_name: "mysql"
+    file_sd_configs:
+      - files: ["targets/mysql.yml"]
+    params:
+      collect: ["global_status", "global_variables", "slave_status", "innodb_metrics"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: host
+        regex: "([^:]+):.*"
+
+  # ============ TiDB (PD 节点) ============
+  - job_name: "tidb_pd"
+    static_configs:
+      - targets:
+          - "10.0.4.10:2379"
+    metrics_path: /metrics
+  - job_name: "tidb_server"
+    static_configs:
+      - targets:
+          - "10.0.4.10:10080"
+    metrics_path: /metrics
+  - job_name: "tikv"
+    static_configs:
+      - targets:
+          - "10.0.4.20:20180"
+          - "10.0.4.21:20180"
+    metrics_path: /metrics
+
+  # ============ Redis ============
+  - job_name: "redis"
+    file_sd_configs:
+      - files: ["targets/redis.yml"]
+
+  # ============ Nginx ============
+  - job_name: "nginx"
+    file_sd_configs:
+      - files: ["targets/nginx.yml"]
+
+  # ============ K8s (kube-state-metrics + cAdvisor) ============
+  - job_name: "kube-state-metrics"
+    static_configs:
+      - targets: ["10.0.6.10:30500"]   # kube-state-metrics NodePort/ClusterIP
+  - job_name: "kubernetes-cadvisor"
+    scheme: https
+    tls_config:
+      ca_file: /etc/kubernetes/pki/ca.crt
+      insecure_skip_verify: true
+    bearer_token_file: /etc/kubernetes/pki/token.csv
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: "10.0.6.10:6443"
+        source_labels: [__address__]
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: "(.+)"
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+
+  # ============ K8s Pod 自动发现 ============
+  - job_name: "kubernetes-pods"
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: "(.+)"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port, __meta_kubernetes_pod_ip]
+        action: replace
+        target_label: __address__
+        regex: "(.+);(.+)"
+        replacement: "$2:$1"
+
+  # ============ blackbox_exporter (端口/HTTP 探活) ============
+  - job_name: "blackbox_http"
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    file_sd_configs:
+      - files: ["targets/blackbox_http.yml"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: "10.0.0.10:9115"
+  - job_name: "blackbox_tcp"
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    file_sd_configs:
+      - files: ["targets/blackbox_tcp.yml"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: "10.0.0.10:9115"
+  - job_name: "blackbox_icmp"
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    file_sd_configs:
+      - files: ["targets/blackbox_icmp.yml"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: "10.0.0.10:9115"
+
+# ============ 远程写入 (长期存储 VictoriaMetrics) ============
+remote_write:
+  - url: "http://10.0.0.13:8428/api/v1/write"
+    queue_config:
+      capacity: 10000
+      max_samples_per_send: 2000
+      max_shards: 30

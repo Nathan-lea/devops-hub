@@ -1,0 +1,79 @@
+# MySQL 告警规则
+groups:
+  - name: mysql_alerts
+    rules:
+      # MySQL 实例宕机
+      - alert: MysqlDown
+        expr: mysql_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "MySQL {{ $labels.host }} 宕机"
+          description: "MySQL 实例已离线"
+
+      # 主从同步中断
+      - alert: MysqlReplicationBroken
+        expr: mysql_slave_status_slave_io_running == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL {{ $labels.host }} 主从 IO 线程中断"
+
+      - alert: MysqlReplicationSQLBroken
+        expr: mysql_slave_status_slave_sql_running == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL {{ $labels.host }} 主从 SQL 线程中断"
+
+      # 主从延迟
+      - alert: MysqlReplicationLag
+        expr: mysql_slave_status_seconds_behind_master > 120
+        for: 2m
+        labels:
+          severity: major
+        annotations:
+          summary: "MySQL {{ $labels.host }} 主从延迟"
+          description: "复制延迟 {{ $value }} 秒"
+
+      # 连接数过高
+      - alert: MysqlTooManyConnections
+        expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections > 0.8
+        for: 2m
+        labels:
+          severity: major
+        annotations:
+          summary: "MySQL {{ $labels.host }} 连接数过高"
+          description: "连接数超过最大限制的 80%"
+
+      # 慢查询激增
+      - alert: MysqlSlowQueries
+        expr: increase(mysql_global_status_slow_queries[5m]) > 10
+        labels:
+          severity: minor
+        annotations:
+          summary: "MySQL {{ $labels.host }} 慢查询激增"
+          description: "5 分钟内新增 {{ $value }} 条慢查询"
+
+      # InnoDB 缓冲池命中率低
+      - alert: MysqlLowBufferPoolHitRate
+        expr: rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: minor
+        annotations:
+          summary: "MySQL {{ $labels.host }} 缓冲池命中率低"
+          description: "缓冲池命中率 < 95%，建议调大 innodb_buffer_pool_size"
+
+      # Aborted 连接
+      - alert: MysqlAbortedConnections
+        expr: increase(mysql_global_status_aborted_connects[5m]) > 20
+        labels:
+          severity: minor
+        annotations:
+          summary: "MySQL {{ $labels.host }} 异常连接中断"
+          description: "5 分钟内 {{ $value }} 次连接被中止"

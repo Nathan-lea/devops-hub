@@ -1,0 +1,7 @@
+- targets:
+    - 10.0.2.10:9104
+    - 10.0.2.11:9104
+    - 10.0.2.12:9104
+  labels:
+    role: mysql
+    env: production

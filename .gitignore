@@ -1,0 +1,22 @@
+# 编辑器临时文件
+*.kate-swp
+*.swp
+*~
+*.swo
+.DS_Store
+
+# Ansible
+*.retry
+vault_password
+.vault_pass
+
+# 运行时缓存
+/tmp/ansible_facts/
+__pycache__/
+*.pyc
+
+# 敏感凭据（勿提交）
+secrets/
+*.key
+*.pem
+.env

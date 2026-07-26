@@ -1,0 +1,7 @@
+- targets:
+    - 10.0.1.11:9113
+    - 10.0.1.12:9113
+    - 10.0.1.13:9113
+  labels:
+    role: web
+    env: production

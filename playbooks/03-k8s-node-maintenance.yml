@@ -1,0 +1,111 @@
+---
+# Playbook: K8s 节点维护
+# 功能：节点排空、维护、恢复、证书检查
+
+- name: K8s 节点维护
+  hosts: k8s_worker:k8s_master
+  become: yes
+  serial: 1    # 逐台执行，避免同时影响
+  vars:
+    drain_timeout: 120s
+    kube_version: "v1.30.0"
+
+  tasks:
+    # ========== 维护模式：排空节点 ==========
+    - name: 排空节点（维护前）
+      command: >
+        kubectl drain {{ inventory_hostname }}
+        --ignore-daemonsets
+        --delete-emptydir-data
+        --timeout={{ drain_timeout }}
+        --force
+      delegate_to: "{{ groups['k8s_master'][0] }}"
+      when: drain_node | default(false) | bool
+
+    - name: 等待节点排空完成
+      command: kubectl get node {{ inventory_hostname }} -o jsonpath='{.spec.unschedulable}'
+      delegate_to: "{{ groups['k8s_master'][0] }}"
+      register: unschedulable
+      until: unschedulable.stdout == "true"
+      retries: 5
+      delay: 10
+      when: drain_node | default(false) | bool
+
+    # ========== 节点健康检查 ==========
+    - name: 检查 kubelet 状态
+      systemd:
+        name: kubelet
+      register: kubelet_status
+
+    - name: 检查 containerd 状态
+      systemd:
+        name: containerd
+      register: containerd_status
+
+    - name: 检查 kubelet 配置
+      command: kubectl get node {{ inventory_hostname }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+      delegate_to: "{{ groups['k8s_master'][0] }}"
+      register: node_ready
+      changed_when: false
+
+    - name: 显示节点状态
+      debug:
+        msg:
+          - "节点: {{ inventory_hostname }}"
+          - "kubelet: {{ '运行中' if kubelet_status.status.ActiveState == 'active' else '异常' }}"
+          - "containerd: {{ '运行中' if containerd_status.status.ActiveState == 'active' else '异常' }}"
+          - "Ready: {{ node_ready.stdout }}"
+
+    # ========== 证书检查 ==========
+    - name: 检查 K8s 证书有效期
+      shell: |
+        find /etc/kubernetes/pki -name "*.crt" -exec sh -c '
+          expiry=$(openssl x509 -in "{}" -noout -enddate 2>/dev/null | cut -d= -f2)
+          days=$(( ($(date -d "$expiry" +%s) - $(date +%s)) / 86400 ))
+          if [ "$days" -lt 90 ]; then
+            echo "WARN: {} 剩余 ${days} 天"
+          fi
+        ' \;
+      register: cert_check
+      changed_when: false
+      failed_when: false
+      when: "'k8s_master' in group_names"
+
+    - name: 显示证书检查结果
+      debug:
+        var: cert_check.stdout_lines
+      when: cert_check.stdout_lines | length > 0
+
+    # ========== 清理节点资源 ==========
+    - name: 清理未使用的容器镜像
+      command: crictl rmi --prune
+      register: image_prune
+      changed_when: "'deleted' in image_prune.stdout.lower()"
+      failed_when: false
+
+    - name: 清理旧 journal 日志
+      command: journalctl --vacuum-time=7d
+      register: journal_clean
+      changed_when: "'Deleted' in journal_clean.stdout or 'freed' in journal_clean.stdout"
+
+    # ========== 恢复节点 ==========
+    - name: 恢复节点调度
+      command: kubectl uncordon {{ inventory_hostname }}
+      delegate_to: "{{ groups['k8s_master'][0] }}"
+      when: drain_node | default(false) | bool
+
+    - name: 验证节点恢复
+      command: kubectl get node {{ inventory_hostname }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+      delegate_to: "{{ groups['k8s_master'][0] }}"
+      register: node_ready_after
+      until: node_ready_after.stdout == "True"
+      retries: 10
+      delay: 10
+      when: drain_node | default(false) | bool
+
+    - name: 节点维护完成
+      debug:
+        msg:
+          - "节点 {{ inventory_hostname }} 维护完成"
+          - "镜像清理: {{ image_prune.stdout_lines[0] | default('无') }}"
+          - "日志清理: {{ journal_clean.stdout_lines[0] | default('无') }}"

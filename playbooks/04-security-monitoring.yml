@@ -1,0 +1,468 @@
+---
+# Playbook: 安全监控系统部署
+# 部署：Wazuh Agent、Suricata、fail2ban扩展、入侵检测脚本、网络异常检测脚本
+# 执行：ansible-playbook 04-security-monitoring.yml
+
+- name: 安全监控系统部署
+  hosts: all
+  become: yes
+  vars:
+    wazuh_server: "10.0.0.16"
+    wazuh_registration_password: "{{ vault_wazuh_reg_pass }}"
+    scripts_dir: "/usr/local/bin"
+    metrics_dir: "/var/lib/node_exporter/textfile"
+
+  tasks:
+    # ========== 1. Wazuh Agent 部署 ==========
+    - name: 添加 Wazuh 仓库（Debian/Ubuntu）
+      apt:
+        deb: "https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/wazuh-agent_4.7.0-1_amd64.deb"
+        state: present
+      when: ansible_os_family == "Debian"
+      failed_when: false
+
+    - name: 添加 Wazuh 仓库（CentOS/RHEL）
+      yum:
+        name: "https://packages.wazuh.com/4.x/yum/wazuh-agent-4.7.0-1.x86_64.rpm"
+        state: present
+        disable_gpg_check: yes
+      when: ansible_os_family == "RedHat"
+      failed_when: false
+
+    - name: 配置 Wazuh Agent
+      template:
+        src: templates/wazuh-agent.conf.j2
+        dest: /var/ossec/etc/ossec.conf
+        mode: "0640"
+      notify: restart wazuh-agent
+
+    - name: 注册 Wazuh Agent
+      shell: |
+        /var/ossec/bin/agent-auth -m {{ wazuh_server }} \
+          -P {{ wazuh_registration_password }} \
+          -A {{ inventory_hostname }}
+      args:
+        creates: /var/ossec/etc/client.keys
+      failed_when: false
+
+    - name: 启动 Wazuh Agent
+      service:
+        name: wazuh-agent
+        state: started
+        enabled: yes
+      failed_when: false
+
+    # ========== 2. Suricata 部署（关键节点） ==========
+    - name: 安装 Suricata（Debian/Ubuntu）
+      apt:
+        name: suricata
+        state: present
+      when: ansible_os_family == "Debian" and "'monitoring' in group_names or 'web' in group_names"
+
+    - name: 安装 Suricata（CentOS/RHEL）
+      yum:
+        name: suricata
+        state: present
+      when: ansible_os_family == "RedHat" and "'monitoring' in group_names or 'web' in group_names"
+
+    - name: 配置 Suricata
+      copy:
+        dest: /etc/suricata/suricata.yaml
+        content: |
+          %YAML 1.1
+          ---
+          default-log-dir: /var/log/suricata/
+
+          vars:
+            address-groups:
+              HOME_NET: "[10.0.0.0/8,192.168.0.0/16,172.16.0.0/12]"
+              EXTERNAL_NET: "!$HOME_NET"
+              HTTP_SERVERS: "$HOME_NET"
+              SQL_SERVERS: "$HOME_NET"
+              DNS_SERVERS: "$HOME_NET"
+            port-groups:
+              HTTP_PORTS: "80"
+              SHELLCODE_PORTS: "!80"
+              SSH_PORTS: "22222"
+              DNP3_PORTS: "20000"
+              MODBUS_PORTS: "502"
+
+          outputs:
+            - eve-log:
+                enabled: yes
+                filetype: regular
+                filename: eve.json
+                types:
+                  - alert
+                  - http
+                  - dns
+                  - tls
+                  - files
+                  - flow
+                  - ssh
+
+            - stats:
+                enabled: yes
+                interval: 30
+
+          app-layer:
+            protocols:
+              http:
+                enabled: yes
+              dns:
+                enabled: yes
+              tls:
+                enabled: yes
+              ssh:
+                enabled: yes
+
+          default-rule-path: /etc/suricata/rules
+          rule-files:
+            - local.rules
+            - emerging-ftp.rules
+            - emerging-policy.rules
+            - emerging-trojan.rules
+            - emerging-scanners.rules
+            - emerging-attack_response.rules
+            - emerging-dos.rules
+            - emerging-malware.rules
+            - emerging-exploit.rules
+            - emerging-netbios.rules
+            - emerging-scan.rules
+            - emerging-web_client.rules
+            - emerging-chat.rules
+            - emerging-current_events.rules
+            - emerging-misc.rules
+            - emerging-smtp.rules
+            - emerging-web_server.rules
+            - emerging-dns.rules
+            - emerging-imap.rules
+            - emerging-sql.rules
+            - emerging-telnet.rules
+            - emerging-voip.rules
+
+          # 仅检测模式（不阻断）
+          af-packet:
+            - interface: eth0
+              cluster-id: 99
+              cluster-type: cluster_flow
+              defrag: yes
+              use-mmap: yes
+              tpacket-v3: yes
+
+          # 性能配置
+          threading:
+            set-cpu-affinity: no
+            detect-thread-ratio: 1.0
+
+          pcap-file:
+            checksum-checks: auto
+      when: "'monitoring' in group_names or 'web' in group_names"
+      notify: restart suricata
+
+    - name: 部署 Suricata 自定义规则
+      copy:
+        dest: /etc/suricata/rules/local.rules
+        content: |
+          # ============ 自定义安全规则 ============
+
+          # SSH 暴力破解
+          alert tcp $EXTERNAL_NET any -> $HOME_NET 22222 (msg:"SSH Brute Force"; \
+            flow:to_server; flags:S; threshold:type threshold,track by_src,count 5,seconds 60; \
+            classtype:attempted-admin; sid:1000001; rev:1;)
+
+          # 端口扫描
+          alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"Port Scan Detected"; \
+            flags:S,12; detection_filter:track by_src,count 20,seconds 10; \
+            classtype:attempted-recon; sid:1000002; rev:1;)
+
+          # 反向 Shell 检测
+          alert tcp $HOME_NET any -> $EXTERNAL_NET ![80,443,53,123,3306,6379,9100,9090] \
+            (msg:"Possible Reverse Shell"; flow:established; dsize:>100; \
+            classtype:trojan-activity; sid:1000003; rev:1;)
+
+          # 挖矿矿池连接
+          alert tls $HOME_NET any -> $EXTERNAL_NET any (msg:"Mining Pool Connection"; \
+            tls.subject; content:"pool"; nocase; \
+            classtype:trojan-activity; sid:1000004; rev:1;)
+
+          # DNS 隧道
+          alert dns $HOME_NET any -> any any (msg:"DNS Tunneling - Long Query"; \
+            dns.query; pcre:"/^.{50,}$/"; \
+            classtyle:trojan-activity; sid:1000005; rev:1;)
+
+          # 数据外泄
+          alert tcp $HOME_NET any -> $EXTERNAL_NET ![80,443,53,123] \
+            (msg:"Possible Data Exfiltration"; flow:established; \
+            threshold:type both,track by_src,count 1,seconds 60; \
+            classtype:exfiltration; sid:1000006; rev:1;)
+      when: "'monitoring' in group_names or 'web' in group_names"
+      notify: restart suricata
+
+    - name: 更新 Suricata 规则
+      command: suricata-update
+      when: "'monitoring' in group_names or 'web' in group_names"
+      changed_when: false
+      failed_when: false
+
+    - name: 启动 Suricata
+      service:
+        name: suricata
+        state: started
+        enabled: yes
+      when: "'monitoring' in group_names or 'web' in group_names"
+      failed_when: false
+
+    # ========== 3. fail2ban 扩展配置 ==========
+    - name: 部署 fail2ban 扩展配置
+      copy:
+        dest: /etc/fail2ban/jail.d/ops-security.local
+        content: |
+          # SSH 爆破（激进模式）
+          [sshd-aggressive]
+          enabled = true
+          port = 22222
+          filter = sshd-aggressive
+          maxretry = 2
+          findtime = 60
+          bantime = 604800
+
+          # Nginx 请求限制
+          [nginx-limit-req]
+          enabled = true
+          port = http,https
+          filter = nginx-limit-req
+          maxretry = 10
+          findtime = 60
+          bantime = 3600
+
+          # Nginx 扫描器检测
+          [nginx-botsearch]
+          enabled = true
+          port = http,https
+          filter = nginx-botsearch
+          maxretry = 2
+          findtime = 60
+          bantime = 86400
+
+          # MySQL 爆破
+          [mysqld-auth]
+          enabled = true
+          port = 3306
+          filter = mysqld-auth
+          maxretry = 5
+          findtime = 300
+          bantime = 86400
+
+          # Redis 爆破
+          [redis]
+          enabled = true
+          port = 6379
+          filter = redis
+          maxretry = 3
+          findtime = 60
+          bantime = 86400
+
+          # 递归封禁（被封禁IP再次尝试）
+          [recidive]
+          enabled = true
+          filter = recidive
+          maxretry = 3
+          findtime = 86400
+          bantime = 2592000
+      notify: restart fail2ban
+
+    # ========== 4. 部署入侵检测脚本 ==========
+    - name: 创建指标目录
+      file:
+        path: "{{ metrics_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: 部署入侵检测脚本
+      copy:
+        src: ../scripts/intrusion_detection.sh
+        dest: "{{ scripts_dir }}/intrusion_detection.sh"
+        mode: "0755"
+
+    - name: 部署网络异常检测脚本
+      copy:
+        src: ../scripts/network_anomaly_check.sh
+        dest: "{{ scripts_dir }}/network_anomaly_check.sh"
+        mode: "0755"
+
+    - name: 部署主机隔离脚本
+      copy:
+        dest: "{{ scripts_dir }}/host_isolate.sh"
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          # 主机隔离/解除隔离
+          ACTION="${1:-isolate}"
+
+          if [ "$ACTION" = "isolate" ]; then
+            # 阻断所有入站（仅放行运维网段）
+            iptables -I INPUT -j DROP
+            iptables -I INPUT -s 10.0.0.0/8 -j ACCEPT
+            iptables -I INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+            # K8s 节点摘除
+            if command -v kubectl >/dev/null 2>&1; then
+              kubectl cordon "$(hostname)" 2>/dev/null
+              kubectl drain "$(hostname)" --ignore-daemonsets --delete-emptydir-data --force --timeout=60s 2>/dev/null
+            fi
+            logger -t security "HOST ISOLATED: $(hostname)"
+            echo "ISOLATED"
+          elif [ "$ACTION" = "release" ]; then
+            iptables -D INPUT -j DROP 2>/dev/null
+            if command -v kubectl >/dev/null 2>&1; then
+              kubectl uncordon "$(hostname)" 2>/dev/null
+            fi
+            logger -t security "HOST RELEASED: $(hostname)"
+            echo "RELEASED"
+          fi
+
+    # ========== 5. 配置定时任务 ==========
+    - name: 入侵检测定时任务（每10分钟）
+      cron:
+        name: "intrusion_detection"
+        minute: "*/10"
+        job: "{{ scripts_dir }}/intrusion_detection.sh >/dev/null 2>&1"
+
+    - name: 网络异常检测定时任务（每5分钟）
+      cron:
+        name: "network_anomaly_check"
+        minute: "*/5"
+        job: "{{ scripts_dir }}/network_anomaly_check.sh >/dev/null 2>&1"
+
+    # ========== 6. auditd 网络审计规则 ==========
+    - name: 添加网络连接审计规则
+      copy:
+        dest: /etc/audit/rules.d/network.rules
+        content: |
+          # 网络连接审计
+          -a always,exit -F arch=b64 -S connect -k network_connect
+          -a always,exit -F arch=b64 -S accept -k network_accept
+          -a always,exit -F arch=b64 -S bind -k network_bind
+
+          # 监控网络配置文件
+          -w /etc/hosts -p wa -k network_config
+          -w /etc/resolv.conf -p wa -k network_config
+          -w /etc/nsswitch.conf -p wa -k network_config
+
+          # 监控防火墙配置
+          -w /etc/iptables -p wa -k firewall_config
+          -w /etc/sysconfig/iptables -p wa -k firewall_config
+          -w /etc/nftables.conf -p wa -k firewall_config
+      notify: restart auditd
+
+    # ========== 7. 部署威胁情报更新脚本 ==========
+    - name: 部署威胁情报更新脚本
+      copy:
+        dest: "{{ scripts_dir }}/threat_intel_update.sh"
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          # 威胁情报更新脚本
+          # 定时拉取恶意 IP/域名列表，更新到本地检测系统
+
+          set -euo pipefail
+          INTEL_DIR="/var/lib/threat_intel"
+          mkdir -p "$INTEL_DIR"
+
+          # AbuseIPDB 恶意 IP（需 API Key）
+          if [ -n "${ABUSEIPDB_KEY:-}" ]; then
+            curl -s -G "https://api.abuseipdb.com/api/v2/blacklist" \
+              -H "Key: $ABUSEIPDB_KEY" \
+              -H "Accept: application/json" \
+              --data-urlencode "confidenceMinimum=90" \
+              -o "$INTEL_DIR/abuseipdb.json"
+          fi
+
+          # 更新 Suricata 规则
+          if command -v suricata-update >/dev/null 2>&1; then
+            suricata-update >/dev/null 2>&1
+          fi
+
+          # 生成恶意 IP 列表
+          if [ -f "$INTEL_DIR/abuseipdb.json" ]; then
+            jq -r '.data[] | .ipAddress' "$INTEL_DIR/abuseipdb.json" 2>/dev/null \
+              > "$INTEL_DIR/malicious_ips.txt"
+          fi
+
+          echo "$(date) 威胁情报更新完成: $(wc -l < "$INTEL_DIR/malicious_ips.txt" 2>/dev/null || echo 0) 条 IP"
+
+    - name: 威胁情报更新定时任务（每日）
+      cron:
+        name: "threat_intel_update"
+        hour: "3"
+        minute: "0"
+        job: "{{ scripts_dir }}/threat_intel_update.sh >/dev/null 2>&1"
+
+    # ========== 8. nftables 黑名单集合 ==========
+    - name: 创建 nftables 黑名单集合
+      copy:
+        dest: /etc/nftables.d/blacklist.nft
+        content: |
+          # nftables 黑名单集合
+          # fail2ban 和 Wazuh 主动响应会动态添加 IP
+          table inet filter {
+            set blacklist {
+              type ipv4_addr
+              flags timeout
+              timeout 1h
+            }
+
+            chain input {
+              type filter hook input priority -100; policy accept;
+              ip saddr @blacklist drop
+            }
+          }
+      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
+      failed_when: false
+
+    # ========== 9. 验证 ==========
+    - name: 验证 Wazuh Agent
+      command: /var/ossec/bin/wazuh-control status
+      register: wazuh_status
+      changed_when: false
+      failed_when: false
+
+    - name: 验证 fail2ban
+      command: fail2ban-client status
+      register: fail2ban_status
+      changed_when: false
+      failed_when: false
+
+    - name: 显示部署结果
+      debug:
+        msg:
+          - "{{ inventory_hostname }} 安全监控部署完成"
+          - "Wazuh Agent: {{ '运行中' if wazuh_status.rc == 0 else '未运行' }}"
+          - "fail2ban jails: {{ fail2ban_status.stdout_lines | default(['未运行']) }}"
+          - "入侵检测脚本: 已部署（每10分钟）"
+          - "网络异常检测: 已部署（每5分钟）"
+          - "威胁情报更新: 已部署（每日03:00）"
+
+  handlers:
+    - name: restart wazuh-agent
+      service:
+        name: wazuh-agent
+        state: restarted
+      failed_when: false
+
+    - name: restart suricata
+      service:
+        name: suricata
+        state: restarted
+      failed_when: false
+
+    - name: restart fail2ban
+      service:
+        name: fail2ban
+        state: restarted
+
+    - name: restart auditd
+      service:
+        name: auditd
+        state: restarted
+      failed_when: false

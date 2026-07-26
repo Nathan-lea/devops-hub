@@ -1,0 +1,111 @@
+# Alertmanager 配置
+# 告警路由、分组、收敛、通知
+
+global:
+  resolve_timeout: 5m
+  # SMTP（邮件通知）
+  smtp_smarthost: "smtp.example.com:587"
+  smtp_from: "alert@example.com"
+  smtp_auth_username: "alert@example.com"
+  smtp_auth_password: "YOUR_SMTP_PASS"
+
+# 告警模板
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+
+# 路由规则
+route:
+  group_by: ["alertname", "host", "cluster"]
+  group_wait: 30s          # 首次告警等待时间（聚合）
+  group_interval: 5m        # 同组告警间隔
+  repeat_interval: 4h       # 重复告警间隔
+  receiver: "default"       # 默认接收者
+
+  routes:
+    # P0 紧急 -> 电话 + 短信 + IM
+    - matchers:
+        - severity = "critical"
+      receiver: "critical-notify"
+      group_wait: 0s
+      repeat_interval: 1h
+      continue: false
+
+    # P1 重要 -> 短信 + IM
+    - matchers:
+        - severity = "major"
+      receiver: "major-notify"
+      group_wait: 30s
+      repeat_interval: 2h
+      continue: false
+
+    # P2 次要 -> IM
+    - matchers:
+        - severity = "minor"
+      receiver: "minor-notify"
+      group_wait: 1m
+      repeat_interval: 6h
+      continue: false
+
+    # P3 警告 -> IM（仅工作时间）
+    - matchers:
+        - severity = "warning"
+      receiver: "warning-notify"
+      group_wait: 5m
+      repeat_interval: 24h
+
+# 抑制规则（避免告警风暴）
+inhibit_rules:
+  # 主机宕机时，抑制该主机的其他告警
+  - source_matchers: ["alertname = \"HostDown\""]
+    target_matchers: ["host =~ \".+\""]
+    equal: ["host"]
+
+  # K8s 节点 NotReady 时，抑制该节点的 Pod 告警
+  - source_matchers: ["alertname = \"KubernetesNodeNotReady\""]
+    target_matchers: ["node =~ \".+\""]
+    equal: ["node"]
+
+  # MySQL 主库宕机时，抑制从库相关告警
+  - source_matchers: ["alertname = \"MysqlDown\"", "role = \"master\""]
+    target_matchers: ["role = \"slave\""]
+    equal: ["cluster"]
+
+# 接收者定义
+receivers:
+  - name: "default"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook"   # 统一告警网关
+        send_resolved: true
+
+  - name: "critical-notify"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/critical"
+        send_resolved: true
+    # 电话通知（对接通知服务）
+    pagerduty_configs:
+      - service_key: "YOUR_PAGERDUTY_KEY"
+        severity: critical
+    # 邮件
+    email_configs:
+      - to: "ops-team@example.com"
+        headers:
+          Subject: '[P0-Critical] {{ .CommonLabels.alertname }}'
+
+  - name: "major-notify"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/major"
+        send_resolved: true
+    email_configs:
+      - to: "ops-team@example.com"
+        headers:
+          Subject: '[P1-Major] {{ .CommonLabels.alertname }}'
+
+  - name: "minor-notify"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/minor"
+        send_resolved: true
+
+  - name: "warning-notify"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/warning"
+        send_resolved: true

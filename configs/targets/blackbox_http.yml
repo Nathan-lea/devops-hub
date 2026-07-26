@@ -1,0 +1,7 @@
+- targets:
+    - https://api.example.com/health
+    - https://www.example.com
+    - http://10.0.0.11:3000
+    - http://10.0.0.10:9090
+  labels:
+    probe: http

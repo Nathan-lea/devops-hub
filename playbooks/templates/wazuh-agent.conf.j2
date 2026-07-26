@@ -1,0 +1,174 @@
+<!-- Wazuh Agent 配置模板 -->
+<!-- 由 Ansible 生成 -->
+
+<ossec_config>
+
+  <!-- ========== 管理服务器 ========== -->
+  <client>
+    <server>{{ wazuh_server }}</server>
+    <port>1514</port>
+    <protocol>tcp</protocol>
+    <notify_time>30</notify_time>
+    <time-reconnect>60</time-reconnect>
+    <config-profile>{{ ansible_os_family | lower }}</config-profile>
+  </client>
+
+  <!-- ========== 日志采集 ========== -->
+  <client_buffer>
+    <disabled>no</disabled>
+    <queue_size>16384</queue_size>
+    <events_size>16384</events_size>
+  </client_buffer>
+
+  <!-- ========== 文件完整性监控 (FIM) ========== -->
+  <syscheck>
+    <frequency>43200</frequency>
+    <scan_on_start>yes</scan_on_start>
+
+    <!-- 系统关键文件 -->
+    <directories>/etc</directories>
+    <directories>/usr/bin</directories>
+    <directories>/usr/sbin</directories>
+    <directories>/bin</directories>
+    <directories>/sbin</directories>
+    <directories>/lib</directories>
+    <directories>/usr/lib</directories>
+
+    <!-- 应用配置 -->
+    <directories>/etc/nginx</directories>
+    <directories>/etc/mysql</directories>
+    <directories>/etc/redis</directories>
+    <directories>/etc/kubernetes</directories>
+    <directories>/etc/ssh</directories>
+
+    <!-- K8s 证书 -->
+    <directories>/etc/kubernetes/pki</directories>
+
+    <!-- Web 目录（实时） -->
+    <directories realtime="yes">/var/www/html</directories>
+    <directories realtime="yes">/app</directories>
+
+    <!-- 定时任务 -->
+    <directories>/etc/cron.d</directories>
+    <directories>/etc/cron.daily</directories>
+    <directories>/etc/cron.hourly</directories>
+
+    <!-- 忽略 -->
+    <ignore>/etc/mtab</ignore>
+    <ignore>/etc/mnttab</ignore>
+    <ignore>/etc/hosts.deny</ignore>
+    <ignore>/etc/mail</ignore>
+    <ignore>/etc/random-seed</ignore>
+    <ignore>/etc/adjtime</ignore>
+    <ignore>/etc/ld.so.cache</ignore>
+    <ignore>/var/log</ignore>
+
+    <!-- 不监控差异的文件 -->
+    <nodiff>/etc/ssl/private</nodiff>
+  </syscheck>
+
+  <!-- ========== Rootkit 检测 ========== -->
+  <rootcheck>
+    <rootkit_files>/var/ossec/etc/shared/rootkit_files.txt</rootkit_files>
+    <rootkit_trojans>/var/ossec/etc/shared/rootkit_trojans.txt</rootkit_trojans>
+    <frequency>86400</frequency>
+    <scan_on_start>yes</scan_on_start>
+  </rootcheck>
+
+  <!-- ========== 日志文件监控 ========== -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/messages</location>
+  </localfile>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/syslog</location>
+  </localfile>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/secure</location>
+  </localfile>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/auth.log</location>
+  </localfile>
+
+  <localfile>
+    <log_format>audit</log_format>
+    <location>/var/log/audit/audit.log</location>
+  </localfile>
+
+  <!-- Nginx 日志 -->
+  <localfile>
+    <log_format>nginx_error</log_format>
+    <location>/var/log/nginx/error.log</location>
+  </localfile>
+
+  <!-- MySQL 日志 -->
+  <localfile>
+    <log_format>mysql_log</log_format>
+    <location>/var/log/mysql/error.log</location>
+  </localfile>
+
+  <!-- K8s 日志 -->
+  <localfile>
+    <log_format>json</log_format>
+    <location>/var/log/kube-audit/audit.log</location>
+  </localfile>
+
+  <!-- ========== 主动响应 ========== -->
+  <!-- SSH 爆破自动封禁 -->
+  <command>
+    <name>firewall-drop</name>
+    <executable>firewall-drop.sh</executable>
+    <expect>srcip</expect>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+
+  <active-response>
+    <command>firewall-drop</command>
+    <location>local</location>
+    <rules_id>5712,5715,5716,5717,5718,5740,5741,5742,5743,5744,5745,5746,5747,5748</rules_id>
+    <timeout>86400</timeout>
+  </active-response>
+
+  <!-- 检测到 Web Shell 自动封禁 -->
+  <active-response>
+    <command>firewall-drop</command>
+    <location>local</location>
+    <rules_id>31151,31152,31153,31171,31172,31173</rules_id>
+    <timeout>604800</timeout>
+  </active-response>
+
+  <!-- ========== 系统信息采集 ========== -->
+  <wodle name="syscollector">
+    <enabled>yes</enabled>
+    <interval>1h</interval>
+    <network>yes</network>
+    <os>yes</os>
+    <hardware>yes</hardware>
+    <packages>yes</packages>
+    <processes>yes</processes>
+    <ports all="yes">yes</ports>
+  </wodle>
+
+  <!-- ========== 漏洞检测 ========== -->
+  <wodle name="vulnerability-detection">
+    <enabled>yes</enabled>
+    <interval>1h</interval>
+    <ignore_time>6h</ignore_time>
+    <update_interval>3h</update_interval>
+  </wodle>
+
+  <!-- ========== CIS 基线检查 ========== -->
+  <wodle name="cis-cat">
+    <enabled>yes</enabled>
+    <interval>86400</interval>
+    <scan-on-start>yes</scan-on-start>
+    <profile>level1</profile>
+  </wodle>
+
+</ossec_config>

@@ -1,0 +1,85 @@
+# Kubernetes 告警规则
+groups:
+  - name: k8s_alerts
+    rules:
+      # 节点 NotReady
+      - alert: KubernetesNodeNotReady
+        expr: kube_node_status_condition{condition="Ready", status!="true"} == 1
+        for: 3m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "K8s 节点 {{ $labels.node }} NotReady"
+
+      # Pod CrashLoopBackOff
+      - alert: KubernetesPodCrashLooping
+        expr: increase(kube_pod_container_status_restarts_total[15m]) > 5
+        for: 5m
+        labels:
+          severity: major
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} CrashLoopBackOff"
+
+      # Pod Pending
+      - alert: KubernetesPodPending
+        expr: kube_pod_status_phase{phase="Pending"} == 1
+        for: 5m
+        labels:
+          severity: major
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 处于 Pending"
+
+      # Deployment 副本不足
+      - alert: KubernetesDeploymentReplicasMismatch
+        expr: kube_deployment_status_replicas_available != kube_deployment_spec_replicas
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} 副本数不足"
+          description: "期望 {{ $labels.replicas }} 实际 {{ $value }}"
+
+      # etcd 无 leader
+      - alert: EtcdNoLeader
+        expr: etcd_server_has_leader == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "etcd 无 leader"
+
+      # API Server 5xx 错误率
+      - alert: KubernetesApiServerErrors
+        expr: sum(rate(apiserver_request_total{code=~"5.."}[5m])) / sum(rate(apiserver_request_total[5m])) * 100 > 1
+        for: 2m
+        labels:
+          severity: major
+        annotations:
+          summary: "K8s API Server 5xx 错误率 > 1%"
+
+      # PVC 容量
+      - alert: KubernetesPvcAlmostFull
+        expr: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.85
+        for: 5m
+        labels:
+          severity: major
+        annotations:
+          summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} 使用率 > 85%"
+
+      # Job 失败
+      - alert: KubernetesJobFailed
+        expr: kube_job_failed > 0
+        labels:
+          severity: minor
+        annotations:
+          summary: "Job {{ $labels.namespace }}/{{ $labels.job_name }} 失败"
+
+      # 节点 CPU 资源压力大
+      - alert: KubernetesNodeCpuPressure
+        expr: kube_node_status_allocatable{resource="cpu"} / kube_node_status_capacity{resource="cpu"} < 0.1
+        for: 10m
+        labels:
+          severity: minor
+        annotations:
+          summary: "节点 {{ $labels.node }} 可分配 CPU < 10%"

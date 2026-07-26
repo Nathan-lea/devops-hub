@@ -1,0 +1,142 @@
+---
+# Playbook: MySQL 日常运维
+# 功能：备份、慢查询分析、主从检查、参数检查
+
+- name: MySQL 日常运维
+  hosts: mysql
+  become: yes
+  vars:
+    mysql_backup_user: "backup"
+    mysql_backup_pass: "{{ vault_mysql_backup_pass }}"
+    mysql_monitor_user: "monitor"
+    mysql_monitor_pass: "{{ vault_mysql_monitor_pass }}"
+    backup_dir: "/data/backup/mysql"
+    s3_bucket: "s3://db-backup/mysql"
+    slow_log: "/var/log/mysql/slow.log"
+
+  tasks:
+    # ========== 1. 创建监控账号 ==========
+    - name: 创建 MySQL 监控账号
+      mysql_user:
+        name: "{{ mysql_monitor_user }}"
+        password: "{{ mysql_monitor_pass }}"
+        priv: "*.*:PROCESS,REPLICATION CLIENT,SELECT"
+        host: "10.0.0.10"
+        state: present
+      run_once: true
+
+    # ========== 2. 创建备份账号 ==========
+    - name: 创建 MySQL 备份账号
+      mysql_user:
+        name: "{{ mysql_backup_user }}"
+        password: "{{ mysql_backup_pass }}"
+        priv: "*.*:RELOAD,LOCK TABLES,REPLICATION CLIENT,PROCESS,SELECT"
+        host: "localhost"
+        state: present
+      run_once: true
+
+    # ========== 3. 全量备份 ==========
+    - name: 创建备份目录
+      file:
+        path: "{{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}"
+        state: directory
+        mode: "0750"
+
+    - name: 执行 xtrabackup 全量备份
+      shell: |
+        xtrabackup --backup \
+          --user={{ mysql_backup_user }} --password={{ mysql_backup_pass }} \
+          --target-dir={{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }} \
+          --parallel=4 --compress
+      args:
+        creates: "{{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}/xtrabackup_info"
+
+    - name: 上传备份到 S3
+      shell: |
+        rclone copy {{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }} \
+          {{ s3_bucket }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}/ --progress
+      async: 3600
+      poll: 0
+
+    # ========== 4. 清理过期备份 ==========
+    - name: 清理 7 天前本地备份
+      find:
+        paths: "{{ backup_dir }}/{{ inventory_hostname }}"
+        age: 7d
+        recurse: yes
+        file_type: directory
+      register: old_backups
+
+    - name: 删除过期备份
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"
+
+    # ========== 5. 慢查询分析 ==========
+    - name: 检查慢查询日志
+      stat:
+        path: "{{ slow_log }}"
+      register: slow_log_stat
+
+    - name: 生成慢查询分析报告
+      shell: |
+        pt-query-digest {{ slow_log }} > /tmp/slow_report_{{ ansible_date_time.date }}.txt
+      when: slow_log_stat.stat.exists
+      failed_when: false
+
+    - name: 拉取慢查询报告到管控机
+      fetch:
+        src: "/tmp/slow_report_{{ ansible_date_time.date }}.txt"
+        dest: "/var/log/mysql_reports/{{ inventory_hostname }}/"
+        flat: yes
+      when: slow_log_stat.stat.exists
+
+    # ========== 6. 主从健康检查 ==========
+    - name: 检查主从状态
+      mysql_replication:
+        mode: getreplica
+        login_user: "{{ mysql_monitor_user }}"
+        login_password: "{{ mysql_monitor_pass }}"
+      register: repl_status
+      failed_when: false
+
+    - name: 主从状态结果
+      debug:
+        msg:
+          - "{{ inventory_hostname }}: IO={% if repl_status.is_running %}Yes{% else %}No{% endif %}"
+          - "SQL={% if repl_status.is_running %}Yes{% else %}No{% endif %}"
+          - "延迟={{ repl_status.seconds_behind_master | default('N/A') }}s"
+      when: repl_status is defined
+
+    # ========== 7. Binlog 清理 ==========
+    - name: 清理过期 binlog
+      mysql_variables:
+        variable: binlog_expire_logs_seconds
+        value: "259200"
+      run_once: true
+
+    - name: PURGE 过期 binlog
+      shell: |
+        mysql -u{{ mysql_backup_user }} -p{{ mysql_backup_pass }} -e "PURGE BINARY LOGS BEFORE DATE_SUB(NOW(), INTERVAL 3 DAY);"
+      run_once: true
+      failed_when: false
+
+    # ========== 8. 表优化建议 ==========
+    - name: 检查碎片率高的表
+      shell: |
+        mysql -u{{ mysql_monitor_user }} -p{{ mysql_monitor_pass }} -e "
+        SELECT TABLE_SCHEMA, TABLE_NAME,
+               ROUND(DATA_FREE/(DATA_LENGTH+INDEX_LENGTH)*100, 2) AS frag_pct
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+          AND DATA_LENGTH+INDEX_LENGTH > 104857600
+          AND DATA_FREE/(DATA_LENGTH+INDEX_LENGTH) > 0.3
+        ORDER BY frag_pct DESC LIMIT 10;"
+      register: frag_tables
+      changed_when: false
+
+    - name: 显示碎片率高的表
+      debug:
+        var: frag_tables.stdout_lines
+      when: frag_tables.stdout_lines | length > 1

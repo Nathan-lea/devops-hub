@@ -1,0 +1,25 @@
+# Chrony 配置文件模板
+# 由 Ansible 生成
+
+# 使用国内的 NTP 服务器
+{% for server in ntp_servers %}
+server {{ server }} iburst
+{% endfor %}
+
+# 允许同步的大时间偏差
+makestep 1.0 3
+
+# 启用硬件时间同步
+rtcsync
+
+# 允许客户端同步（如果这台是 NTP 服务器）
+# allow 10.0.0.0/8
+
+# 指定 chrony 的日志
+logdir /var/log/chrony
+
+# 选择最优的 NTP 源
+noclientlog
+
+# 最大偏差修正
+maxupdateskew 100.0

@@ -1,0 +1,299 @@
+---
+# Playbook: 系统安全基线加固
+# 适用：Debian/Ubuntu/CentOS
+# 执行：ansible-playbook 01-system-baseline.yml
+
+- name: 系统安全基线加固
+  hosts: all
+  become: yes
+  vars:
+    password_max_days: 90
+    password_min_days: 7
+    password_min_len: 12
+    lock_inactive_days: 30
+
+  tasks:
+    # ========== 1. 密码策略 ==========
+    - name: 配置密码策略（login.defs）
+      lineinfile:
+        path: /etc/login.defs
+        regexp: "^{{ item.key }}"
+        line: "{{ item.key }} {{ item.value }}"
+      loop:
+        - { key: "PASS_MAX_DAYS", value: "{{ password_max_days }}" }
+        - { key: "PASS_MIN_DAYS", value: "{{ password_min_days }}" }
+        - { key: "PASS_MIN_LEN", value: "{{ password_min_len }}" }
+        - { key: "PASS_WARN_AGE", value: "7" }
+        - { key: "LOGIN_RETRIES", value: "5" }
+        - { key: "LOGIN_TIMEOUT", value: "60" }
+
+    - name: 安装 pwquality（Debian/Ubuntu）
+      apt:
+        name: libpam-pwquality
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: 安装 pwquality（CentOS/RHEL）
+      yum:
+        name: libpwquality
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: 配置密码复杂度
+      copy:
+        dest: /etc/security/pwquality.conf
+        content: |
+          minlen = 12
+          minclass = 4
+          maxrepeat = 3
+          maxclassrepeat = 4
+          dcredit = -1
+          ucredit = -1
+          ocredit = -1
+          lcredit = -1
+          usercheck = 1
+          dictcheck = 1
+          enforce_for_root = 1
+
+    # ========== 2. 锁定闲置账号 ==========
+    - name: 锁定 30 天未登录的账号
+      shell: |
+        for user in $(awk -F: '$3>=1000 && $1!="nobody" {print $1}' /etc/passwd); do
+          lastlog=$(lastlog -u "$user" | tail -1 | awk '{print $NF}')
+          if [ "$lastlog" != "Never" ] && [ "$lastlog" != "**Never" ]; then
+            days=$(( ($(date +%s) - $(date -d "$lastlog" +%s 2>/dev/null || echo 0)) / 86400 ))
+            if [ "$days" -gt {{ lock_inactive_days }} ]; then
+              usermod -L "$user" 2>/dev/null
+              echo "locked: $user (inactive $days days)"
+            fi
+          fi
+        done
+      register: lock_result
+      changed_when: "'locked' in lock_result.stdout"
+      failed_when: false
+
+    # ========== 3. SSH 深度加固 ==========
+    - name: SSH 安全配置（端口/协议/算法）
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+        validate: "sshd -t -f %s"
+      loop:
+        - { regexp: "^#?Protocol", line: "Protocol 2" }
+        - { regexp: "^#?X11Forwarding", line: "X11Forwarding no" }
+        - { regexp: "^#?AllowTcpForwarding", line: "AllowTcpForwarding no" }
+        - { regexp: "^#?AllowAgentForwarding", line: "AllowAgentForwarding no" }
+        - { regexp: "^#?PermitTunnel", line: "PermitTunnel no" }
+        - { regexp: "^#?PermitEmptyPasswords", line: "PermitEmptyPasswords no" }
+        - { regexp: "^#?GatewayPorts", line: "GatewayPorts no" }
+        - { regexp: "^#?UseDNS", line: "UseDNS no" }
+        - { regexp: "^#?GSSAPIAuthentication", line: "GSSAPIAuthentication no" }
+        - { regexp: "^#?KbdInteractiveAuthentication", line: "KbdInteractiveAuthentication no" }
+      notify: restart sshd
+
+    # ========== 4. fail2ban ==========
+    - name: 安装 fail2ban
+      package:
+        name: fail2ban
+        state: present
+
+    - name: 配置 fail2ban
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [DEFAULT]
+          bantime = 3600
+          findtime = 600
+          maxretry = 5
+          backend = systemd
+
+          [sshd]
+          enabled = true
+          port = 22222
+          filter = sshd
+          logpath = %(sshd_log)s
+          maxretry = 3
+          bantime = 86400
+      notify: restart fail2ban
+
+    - name: 启动 fail2ban
+      service:
+        name: fail2ban
+        state: started
+        enabled: yes
+
+    # ========== 5. 文件权限审计 ==========
+    - name: 检查关键文件权限
+      stat:
+        path: "{{ item.path }}"
+      loop:
+        - { path: /etc/passwd, expected: "0644" }
+        - { path: /etc/shadow, expected: "0000" }
+        - { path: /etc/group, expected: "0644" }
+        - { path: /etc/gshadow, expected: "0000" }
+        - { path: /etc/sudoers, expected: "0440" }
+      register: file_perms
+
+    - name: 修复关键文件权限
+      file:
+        path: "{{ item.item.path }}"
+        mode: "{{ item.item.expected }}"
+      loop: "{{ file_perms.results }}"
+      when: item.stat.mode != item.item.expected
+
+    # ========== 6. SUID/SGID 审计 ==========
+    - name: 扫描 SUID/SGID 文件
+      shell: "find / -perm -4000 -o -perm -2000 -type f 2>/dev/null | sort"
+      register: suid_files
+      changed_when: false
+
+    - name: 记录 SUID/SGID 清单
+      copy:
+        dest: /var/log/suid_sgid_baseline.txt
+        content: "{{ suid_files.stdout }}\n"
+      changed_when: false
+
+    # ========== 7. 审计日志（auditd） ==========
+    - name: 安装 auditd
+      package:
+        name: audit
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: 安装 auditd（Debian）
+      apt:
+        name: auditd
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: 配置 auditd 规则
+      copy:
+        dest: /etc/audit/rules.d/ops.rules
+        content: |
+          # 监控关键文件
+          -w /etc/passwd -p wa -k identity
+          -w /etc/shadow -p wa -k identity
+          -w /etc/group -p wa -k identity
+          -w /etc/sudoers -p wa -k sudoers
+          -w /etc/sudoers.d/ -p wa -k sudoers
+          -w /etc/ssh/sshd_config -p wa -k ssh_config
+
+          # 监控特权命令
+          -w /usr/bin/sudo -p x -k privilege
+          -w /usr/bin/su -p x -k privilege
+
+          # 监控 cron
+          -w /etc/crontab -p wa -k cron
+          -w /etc/cron.d/ -p wa -k cron
+          -w /etc/cron.daily/ -p wa -k cron
+
+          # 监控登录相关
+          -w /var/log/lastlog -p wa -k logins
+          -w /var/log/faillog -p wa -k logins
+
+          # 系统调用审计
+          -a always,exit -F arch=b64 -S adjtimex,settimeofday -k time-change
+          -a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F a2&0100 -k delete
+      notify: restart auditd
+
+    - name: 启动 auditd
+      service:
+        name: auditd
+        state: started
+        enabled: yes
+
+    # ========== 8. 禁用危险内核模块 ==========
+    - name: 禁用危险内核模块
+      copy:
+        dest: /etc/modprobe.d/ops-blocklist.conf
+        content: |
+          install dccprobe /bin/true
+          install sctp /bin/true
+          install dccp /bin/true
+          install tipc /bin/true
+          install rds /bin/true
+          install cramfs /bin/true
+          install freevxfs /bin/true
+          install jffs2 /bin/true
+          install hfs /bin/true
+          install hfsplus /bin/true
+          install squashfs /bin/true
+          install udf /bin/true
+
+    # ========== 9. 内核安全参数 ==========
+    - name: 内核安全参数
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_file: /etc/sysctl.d/99-security.conf
+        state: present
+        reload: yes
+      loop:
+        - { key: "net.ipv4.conf.all.send_redirects", value: "0" }
+        - { key: "net.ipv4.conf.default.send_redirects", value: "0" }
+        - { key: "net.ipv4.conf.all.accept_redirects", value: "0" }
+        - { key: "net.ipv4.conf.default.accept_redirects", value: "0" }
+        - { key: "net.ipv4.conf.all.accept_source_route", value: "0" }
+        - { key: "net.ipv4.conf.default.accept_source_route", value: "0" }
+        - { key: "net.ipv4.conf.all.log_martians", value: "1" }
+        - { key: "net.ipv4.conf.default.log_martians", value: "1" }
+        - { key: "net.ipv4.icmp_echo_ignore_broadcasts", value: "1" }
+        - { key: "net.ipv4.tcp_syncookies", value: "1" }
+        - { key: "kernel.kptr_restrict", value: "2" }
+        - { key: "kernel.dmesg_restrict", value: "1" }
+        - { key: "kernel.yama.ptrace_scope", value: "1" }
+        - { key: "fs.protected_hardlinks", value: "1" }
+        - { key: "fs.protected_symlinks", value: "1" }
+
+    # ========== 10. logrotate 配置 ==========
+    - name: 配置 logrotate
+      copy:
+        dest: /etc/logrotate.d/ops
+        content: |
+          /var/log/messages /var/log/syslog {
+              daily
+              rotate 30
+              compress
+              delaycompress
+              missingok
+              notifempty
+              create 0640 syslog adm
+          }
+          /var/log/secure /var/log/auth.log {
+              daily
+              rotate 90
+              compress
+              delaycompress
+              missingok
+              notifempty
+              create 0640 syslog adm
+          }
+
+    # ========== 11. 验证 ==========
+    - name: 基线检查汇总
+      debug:
+        msg:
+          - "安全基线加固完成: {{ inventory_hostname }}"
+          - "密码策略: 最大{{ password_max_days }}天 最小{{ password_min_days }}天 长度{{ password_min_len }}"
+          - "fail2ban: 已启用"
+          - "auditd: 已配置"
+          - "SUID/SGID 基线: {{ suid_files.stdout_lines | length }} 个文件"
+
+  handlers:
+    - name: restart sshd
+      service:
+        name: "{% if ansible_os_family == 'RedHat' %}sshd{% else %}ssh{% endif %}"
+        state: restarted
+
+    - name: restart fail2ban
+      service:
+        name: fail2ban
+        state: restarted
+
+    - name: restart auditd
+      service:
+        name: auditd
+        state: restarted
+      failed_when: false

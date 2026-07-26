@@ -1,0 +1,53 @@
+# Blackbox Exporter 配置
+# 用于端口/HTTP/ICMP 探活
+
+modules:
+  # HTTP 探活（检查 2xx 响应）
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200, 201, 202, 204, 301, 302]
+      follow_redirects: true
+      preferred_ip_protocol: ip4
+      method: GET
+
+  # HTTP POST 探活
+  http_post_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: POST
+      headers:
+        Content-Type: application/json
+      body: '{"health": "check"}'
+
+  # TCP 端口探活
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+
+  # SSH 端口探活
+  ssh_banner:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+        - expect: "^SSH-2.0-"
+
+  # ICMP ping 探活
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: ip4
+
+  # DNS 解析检查
+  dns_check:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: "example.com"
+      query_type: A
+      valid_rcodes: [NOERROR]

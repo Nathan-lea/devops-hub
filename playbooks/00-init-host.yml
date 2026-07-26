@@ -1,0 +1,252 @@
+---
+# Playbook: 新主机初始化
+# 适用：Debian/Ubuntu/CentOS 新机上架
+# 执行：ansible-playbook 00-init-host.yml -l <new-host>
+# 幂等：可重复执行
+
+- name: 新主机初始化
+  hosts: all
+  become: yes
+  vars:
+    ops_user: "ops"
+    ops_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... ops@example.com"
+    ntp_servers:
+      - "ntp.aliyun.com"
+      - "cn.pool.ntp.org"
+    timezone: "Asia/Shanghai"
+
+  tasks:
+    # ========== 1. 系统基础设置 ==========
+    - name: 设置主机名
+      hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: 设置时区
+      timezone:
+        name: "{{ timezone }}"
+
+    - name: 配置 hosts
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_host }} {{ inventory_hostname }}"
+        regexp: "{{ inventory_hostname }}$"
+
+    # ========== 2. 运维用户 ==========
+    - name: 创建运维用户
+      user:
+        name: "{{ ops_user }}"
+        shell: /bin/bash
+        groups: "sudo"  # Debian/Ubuntu
+        append: yes
+        create_home: yes
+
+    - name: 配置 sudo 免密（Debian/Ubuntu）
+      copy:
+        dest: "/etc/sudoers.d/{{ ops_user }}"
+        content: "{{ ops_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: "0440"
+        validate: "visudo -cf %s"
+
+    - name: 配置 SSH 公钥
+      authorized_key:
+        user: "{{ ops_user }}"
+        key: "{{ ops_ssh_key }}"
+        state: present
+
+    - name: 创建 .ssh 目录
+      file:
+        path: "/home/{{ ops_user }}/.ssh"
+        state: directory
+        owner: "{{ ops_user }}"
+        group: "{{ ops_user }}"
+        mode: "0700"
+
+    # ========== 3. 包管理器配置 ==========
+    - name: 更新 apt 缓存（Debian/Ubuntu）
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: 安装基础工具（Debian/Ubuntu）
+      apt:
+        name:
+          - vim
+          - htop
+          - iotop
+          - net-tools
+          - curl
+          - wget
+          - unzip
+          - jq
+          - bc
+          - chrony
+          - conntrack
+          - sysstat
+          - logrotate
+          - python3
+          - python3-pip
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: 安装 EPEL（CentOS/RHEL）
+      yum:
+        name: epel-release
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: 安装基础工具（CentOS/RHEL）
+      yum:
+        name:
+          - vim
+          - htop
+          - iotop
+          - net-tools
+          - curl
+          - wget
+          - unzip
+          - jq
+          - bc
+          - chrony
+          - conntrack
+          - sysstat
+          - logrotate
+          - python3
+          - python3-pip
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    # ========== 4. NTP 时间同步 ==========
+    - name: 配置 chrony
+      template:
+        src: templates/chrony.conf.j2
+        dest: /etc/chrony.conf
+      notify: restart chrony
+
+    - name: 启动 chrony
+      service:
+        name: "{% if ansible_os_family == 'RedHat' %}chronyd{% else %}chrony{% endif %}"
+        state: started
+        enabled: yes
+
+    # ========== 5. SSH 加固 ==========
+    - name: SSH 加固配置
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+        validate: "sshd -t -f %s"
+      loop:
+        - { regexp: "^#?PermitRootLogin", line: "PermitRootLogin no" }
+        - { regexp: "^#?PasswordAuthentication", line: "PasswordAuthentication no" }
+        - { regexp: "^#?PubkeyAuthentication", line: "PubkeyAuthentication yes" }
+        - { regexp: "^#?ClientAliveInterval", line: "ClientAliveInterval 300" }
+        - { regexp: "^#?ClientAliveCountMax", line: "ClientAliveCountMax 2" }
+        - { regexp: "^#?MaxAuthTries", line: "MaxAuthTries 3" }
+        - { regexp: "^#?LoginGraceTime", line: "LoginGraceTime 30" }
+      notify: restart sshd
+
+    # ========== 6. 内核参数调优 ==========
+    - name: 内核参数调优
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_file: /etc/sysctl.d/99-ops.conf
+        state: present
+        reload: yes
+      loop:
+        - { key: "net.ipv4.tcp_syncookies", value: "1" }
+        - { key: "net.ipv4.tcp_max_tw_buckets", value: "65535" }
+        - { key: "net.ipv4.tcp_tw_reuse", value: "1" }
+        - { key: "net.ipv4.tcp_fin_timeout", value: "15" }
+        - { key: "net.ipv4.tcp_keepalive_time", value: "600" }
+        - { key: "net.core.somaxconn", value: "65535" }
+        - { key: "net.core.netdev_max_backlog", value: "65535" }
+        - { key: "fs.file-max", value: "1048576" }
+        - { key: "vm.swappiness", value: "10" }
+        - { key: "vm.overcommit_memory", value: "1" }
+
+    - name: 配置 ulimit
+      copy:
+        dest: /etc/security/limits.d/99-ops.conf
+        content: |
+          * soft nofile 65535
+          * hard nofile 65535
+          * soft nproc 65535
+          * hard nproc 65535
+          root soft nofile 65535
+          root hard nofile 65535
+
+    # ========== 7. history 增强 ==========
+    - name: 配置 history 记录格式
+      copy:
+        dest: /etc/profile.d/history.sh
+        content: |
+          export HISTTIMEFORMAT="%F %T `whoami` "
+          export HISTSIZE=10000
+          export HISTFILESIZE=20000
+          export HISTCONTROL=ignoreboth
+          shopt -s histappend
+          PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
+
+    # ========== 8. 禁用非必要服务 ==========
+    - name: 禁用非必要服务
+      service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - postfix
+        - avahi-daemon
+        - cups
+      failed_when: false
+
+    # ========== 9. journald 持久化 ==========
+    - name: 配置 journald 持久化
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: "^#?Storage"
+        line: "Storage=persistent"
+      notify: restart journald
+
+    - name: 创建 journal 目录
+      file:
+        path: /var/log/journal
+        state: directory
+        mode: "2755"
+
+    # ========== 10. 验证 ==========
+    - name: 验证运维用户
+      command: "id {{ ops_user }}"
+      register: user_check
+      changed_when: false
+
+    - name: 验证 chrony
+      command: chronyc tracking
+      register: chrony_check
+      changed_when: false
+      failed_when: false
+
+    - name: 显示初始化结果
+      debug:
+        msg:
+          - "主机 {{ inventory_hostname }} 初始化完成"
+          - "运维用户: {{ user_check.stdout }}"
+          - "时间同步: {{ chrony_check.stdout_lines[1] | default('检查中') }}"
+
+  handlers:
+    - name: restart sshd
+      service:
+        name: "{% if ansible_os_family == 'RedHat' %}sshd{% else %}ssh{% endif %}"
+        state: restarted
+
+    - name: restart chrony
+      service:
+        name: "{% if ansible_os_family == 'RedHat' %}chronyd{% else %}chrony{% endif %}"
+        state: restarted
+
+    - name: restart journald
+      service:
+        name: systemd-journald
+        state: restarted

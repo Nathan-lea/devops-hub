@@ -1,0 +1,307 @@
+# 安全告警规则
+# 基于 Wazuh / Suricata / auditd / fail2ban / 自定义脚本指标
+
+groups:
+  # ============ Wazuh 主机入侵检测告警 ============
+  - name: wazuh_hids_alerts
+    rules:
+      # Wazuh 告警级别 >= 12（严重安全事件）
+      - alert: WazuhCriticalAlert
+        expr: wazuh_alerts{level=~"12|13|14|15"} > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Wazuh 严重安全告警: {{ $labels.rule }}"
+          description: "主机 {{ $labels.agent }} 检测到严重安全事件"
+
+      # Wazuh 告警级别 9-11（高危安全事件）
+      - alert: WazuhHighAlert
+        expr: wazuh_alerts{level=~"9|10|11"} > 0
+        for: 2m
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "Wazuh 高危安全告警: {{ $labels.rule }}"
+          description: "主机 {{ $labels.agent }} 检测到高危安全事件"
+
+      # 文件完整性变更
+      - alert: FileIntegrityChanged
+        expr: wazuh_syscheck_modified_total > 0
+        for: 1m
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.agent }} 关键文件被修改"
+          description: "文件 {{ $labels.file }} 已变更，请确认是否授权"
+
+      # Rootkit 检测
+      - alert: RootkitDetected
+        expr: wazuh_rootcheck_detected > 0
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "{{ $labels.agent }} 检测到 Rootkit"
+          description: "主机可能已被植入 rootkit，请立即隔离排查"
+
+      # sudo 异常使用
+      - alert: SudoAbuseDetected
+        expr: increase(wazuh_sudo_failures[5m]) > 3
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.agent }} sudo 异常使用"
+          description: "5 分钟内 sudo 失败 {{ $value }} 次"
+
+  # ============ Suricata 网络入侵检测告警 ============
+  - name: suricata_nids_alerts
+    rules:
+      # Suricata 严重告警（severity 1）
+      - alert: SuricataCriticalAlert
+        expr: suricata_alerts{severity="1"} > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Suricata 检测到严重网络攻击"
+          description: "规则 {{ $labels.signature }} 命中，源IP {{ $labels.src_ip }}"
+
+      # 端口扫描检测
+      - alert: PortScanDetected
+        expr: increase(suricata_port_scan_total[5m]) > 20
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "检测到端口扫描攻击"
+          description: "源IP {{ $labels.src_ip }} 在 5 分钟内扫描了 {{ $value }} 个端口"
+
+      # 反向 Shell 检测
+      - alert: ReverseShellDetected
+        expr: suricata_reverse_shell_total > 0
+        for: 30s
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "检测到疑似反向 Shell"
+          description: "主机 {{ $labels.src_ip }} 向 {{ $labels.dest_ip }}:{{ $labels.dest_port }} 建立异常出站连接"
+
+      # 挖矿木马连接
+      - alert: CryptoMiningDetected
+        expr: suricata_mining_pool_connection > 0
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "检测到挖矿矿池连接"
+          description: "主机 {{ $labels.src_ip }} 连接矿池 {{ $labels.dest_ip }}"
+
+      # DNS 隧道检测
+      - alert: DnsTunnelingDetected
+        expr: increase(suricata_dns_tunneling_total[10m]) > 5
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "疑似 DNS 隧道攻击"
+          description: "10 分钟内检测到 {{ $value }} 次异常长域名 DNS 查询"
+
+      # 数据外泄检测
+      - alert: DataExfiltrationDetected
+        expr: suricata_data_exfiltration_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "疑似数据外泄"
+          description: "主机 {{ $labels.src_ip }} 有大流量非常规端口出站"
+
+  # ============ fail2ban 暴力破解告警 ============
+  - name: brute_force_alerts
+    rules:
+      # SSH 暴力破解
+      - alert: SshBruteForce
+        expr: increase(fail2ban_banned_total{jail="sshd"}[5m]) > 3
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} SSH 暴力破解攻击"
+          description: "5 分钟内封禁了 {{ $value }} 个攻击 IP"
+
+      # SSH 爆破高危（短时间大量失败）
+      - alert: SshBruteForceCritical
+        expr: increase(fail2ban_failed_total{jail="sshd"}[1m]) > 50
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} 遭遇大规模 SSH 爆破"
+          description: "1 分钟内 {{ $value }} 次失败登录，可能为自动化攻击"
+
+      # Nginx 暴力破解
+      - alert: WebBruteForce
+        expr: increase(fail2ban_banned_total{jail="nginx-limit-req"}[5m]) > 5
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} Web 暴力破解"
+          description: "Nginx 频率限制封禁了 {{ $value }} 个 IP"
+
+      # MySQL 暴力破解
+      - alert: MysqlBruteForce
+        expr: increase(fail2ban_banned_total{jail="mysqld-auth"}[10m]) > 0
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} MySQL 暴力破解"
+          description: "MySQL 认证爆破已封禁 {{ $value }} 个 IP"
+
+  # ============ 异常连接检测告警 ============
+  - name: network_anomaly_alerts
+    rules:
+      # 异常出站连接数
+      - alert: AnomalyOutboundConnections
+        expr: network_anomaly_outbound_total > 0
+        for: 2m
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} 检测到异常出站连接"
+          description: "发现 {{ $value }} 个非白名单出站连接"
+
+      # 新增监听端口
+      - alert: NewListeningPort
+        expr: increase(network_listening_ports_new[1h]) > 0
+        labels:
+          severity: minor
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} 新增监听端口"
+          description: "检测到 {{ $value }} 个新增端口监听，请确认是否授权"
+
+      # 非常规端口出站连接
+      - alert: NonStandardOutboundPort
+        expr: network_nonstandard_outbound_total > 0
+        for: 5m
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} 非常规端口出站连接"
+          description: "检测到非常规端口的出站连接 {{ $value }} 个"
+
+      # 威胁情报命中
+      - alert: ThreatIntelHit
+        expr: threat_intel_match_total > 0
+        for: 30s
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} 威胁情报命中"
+          description: "出站连接匹配到恶意 IoC: {{ $labels.ioc }}"
+
+  # ============ 容器安全告警（Falco） ============
+  - name: container_security_alerts
+    rules:
+      # 容器内执行 Shell
+      - alert: ShellInContainer
+        expr: falco_shell_in_container_total > 0
+        for: 30s
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "容器内执行 Shell"
+          description: "容器 {{ $labels.container }} 内执行了 {{ $labels.proc }}"
+
+      # 特权容器
+      - alert: PrivilegedContainer
+        expr: falco_privileged_container_total > 0
+        for: 1m
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "检测到特权容器"
+          description: "容器 {{ $labels.container }} 以特权模式运行"
+
+      # 容器访问 Kubernetes API
+      - alert: ContainerAccessK8sApi
+        expr: falco_k8s_api_access_total > 0
+        for: 30s
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "容器访问 K8s API"
+          description: "容器 {{ $labels.container }} 尝试访问 Kubernetes API"
+
+      # 容器挂载敏感目录
+      - alert: ContainerMountSensitive
+        expr: falco_mount_sensitive_total > 0
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "容器挂载敏感目录"
+          description: "容器 {{ $labels.container }} 挂载了 {{ $labels.path }}"
+
+  # ============ 审计告警（auditd） ============
+  - name: audit_alerts
+    rules:
+      # 密码文件修改
+      - alert: PasswordFileModified
+        expr: audit_password_file_change_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} 密码文件被修改"
+          description: "/etc/passwd 或 /etc/shadow 被修改"
+
+      # sudoers 文件修改
+      - alert: SudoersModified
+        expr: audit_sudoers_change_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} sudoers 文件被修改"
+          description: "sudo 配置被变更，请确认授权"
+
+      # SSH 配置修改
+      - alert: SshConfigModified
+        expr: audit_ssh_config_change_total > 0
+        for: 1m
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} SSH 配置被修改"
+          description: "/etc/ssh/sshd_config 被变更"
+
+      # cron 任务修改
+      - alert: CronTaskModified
+        expr: audit_cron_change_total > 0
+        for: 2m
+        labels:
+          severity: major
+          team: security
+        annotations:
+          summary: "{{ $labels.host }} cron 任务被修改"
+          description: "定时任务配置被变更，需排查是否有持久化后门"
