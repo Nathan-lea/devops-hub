@@ -44,6 +44,7 @@ devops-hub/
 │   ├── 12-方法论与设计原则.md
 │   ├── 13-Git钩子与分支保护.md
 │   ├── 14-技能矩阵与能力评估.md
+│   ├── ONBOARDING.md
 │   └── README.md
 ├── configs/                        # 配置文件
 │   ├── prometheus.yml              # Prometheus 主配置

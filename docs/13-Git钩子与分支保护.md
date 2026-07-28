@@ -121,7 +121,7 @@ git commit --no-verify -m "..."
 
 ```bash
 # 变量（替换为实际值）
-GITEA_URL="http://localhost/gitea"
+GITEA_URL="<your-gitea-url>"  # 替换为你的 Gitea 实例地址
 OWNER="admin"
 REPO="devops-hub"
 TOKEN="<your_gitea_token>"   # 在 Gitea -> Settings -> Applications 生成

@@ -1,0 +1,1446 @@
+{
+  "project": {
+    "name": "devops-hub",
+    "description": "约 100 台多云异构 Linux 主机的全面运维系统方案：监控、日志、配置管理、数据库运维、K8s、安全合规、入侵检测、备份容灾、告警应急、自动化、方法论",
+    "languages": [
+      "markdown",
+      "yaml",
+      "shell",
+      "jinja2",
+      "ini",
+      "conf"
+    ],
+    "frameworks": [
+      "Prometheus",
+      "Grafana",
+      "Loki",
+      "Ansible",
+      "Wazuh",
+      "Suricata",
+      "Docker Compose",
+      "Kubernetes"
+    ],
+    "analyzedAt": "2026-07-28T12:50:42.544691",
+    "gitCommitHash": "07e2735"
+  },
+  "nodes": [
+    {
+      "id": "document:README",
+      "type": "document",
+      "name": "README",
+      "summary": "项目导航与技术栈总览，含快速导航表、目录结构、安全检测能力覆盖",
+      "tags": [
+        "导航",
+        "总览"
+      ],
+      "complexity": 2,
+      "filePath": "docs/README.md"
+    },
+    {
+      "id": "document:00",
+      "type": "document",
+      "name": "00-总体架构与方案概览",
+      "summary": "七层分层架构、技术选型、管控拓扑、文档导航、设计原则",
+      "tags": [
+        "架构",
+        "选型"
+      ],
+      "complexity": 4,
+      "filePath": "docs/00-总体架构与方案概览.md"
+    },
+    {
+      "id": "document:01",
+      "type": "document",
+      "name": "01-监控体系方案",
+      "summary": "Prometheus+Grafana+exporter 部署与配置，四大黄金信号",
+      "tags": [
+        "监控",
+        "Prometheus"
+      ],
+      "complexity": 3,
+      "filePath": "docs/01-监控体系方案.md"
+    },
+    {
+      "id": "document:02",
+      "type": "document",
+      "name": "02-日志管理方案",
+      "summary": "Loki+Promtail 轻量日志收集与查询",
+      "tags": [
+        "日志",
+        "Loki"
+      ],
+      "complexity": 3,
+      "filePath": "docs/02-日志管理方案.md"
+    },
+    {
+      "id": "document:03",
+      "type": "document",
+      "name": "03-配置管理方案",
+      "summary": "Ansible 主机分组、Playbook 规范、IaC 实践",
+      "tags": [
+        "配置",
+        "Ansible",
+        "IaC"
+      ],
+      "complexity": 4,
+      "filePath": "docs/03-配置管理方案.md"
+    },
+    {
+      "id": "document:04",
+      "type": "document",
+      "name": "04-数据库运维方案",
+      "summary": "MySQL/TiDB/Redis 日常运维与备份恢复",
+      "tags": [
+        "数据库",
+        "备份"
+      ],
+      "complexity": 4,
+      "filePath": "docs/04-数据库运维方案.md"
+    },
+    {
+      "id": "document:05",
+      "type": "document",
+      "name": "05-K8s运维方案",
+      "summary": "集群管理、升级、故障排查、安全加固",
+      "tags": [
+        "K8s",
+        "集群"
+      ],
+      "complexity": 4,
+      "filePath": "docs/05-K8s运维方案.md"
+    },
+    {
+      "id": "document:06",
+      "type": "document",
+      "name": "06-安全合规方案",
+      "summary": "基线扫描、漏洞管理、权限审计、CIS Benchmarks",
+      "tags": [
+        "安全",
+        "合规",
+        "基线"
+      ],
+      "complexity": 4,
+      "filePath": "docs/06-安全合规方案.md"
+    },
+    {
+      "id": "document:07",
+      "type": "document",
+      "name": "07-备份与容灾方案",
+      "summary": "3-2-1 备份原则、分层备份、恢复演练、RTO/RPO",
+      "tags": [
+        "备份",
+        "容灾"
+      ],
+      "complexity": 4,
+      "filePath": "docs/07-备份与容灾方案.md"
+    },
+    {
+      "id": "document:08",
+      "type": "document",
+      "name": "08-告警与应急方案",
+      "summary": "四级告警分级、应急 SOP(OODA)、值班机制",
+      "tags": [
+        "告警",
+        "应急"
+      ],
+      "complexity": 4,
+      "filePath": "docs/08-告警与应急方案.md"
+    },
+    {
+      "id": "document:09",
+      "type": "document",
+      "name": "09-自动化运维手册",
+      "summary": "巡检、批量操作、自愈脚本、AWX 编排",
+      "tags": [
+        "自动化",
+        "巡检"
+      ],
+      "complexity": 3,
+      "filePath": "docs/09-自动化运维手册.md"
+    },
+    {
+      "id": "document:10",
+      "type": "document",
+      "name": "10-实施路线图",
+      "summary": "4 阶段 12 周落地计划、里程碑、资源与预算",
+      "tags": [
+        "路线图",
+        "规划"
+      ],
+      "complexity": 3,
+      "filePath": "docs/10-实施路线图.md"
+    },
+    {
+      "id": "document:11",
+      "type": "document",
+      "name": "11-入侵检测与网络安全方案",
+      "summary": "Wazuh HIDS+Suricata NIDS+Falco+fail2ban+WAF+威胁情报，ATT&CK 覆盖",
+      "tags": [
+        "入侵检测",
+        "网络安全",
+        "IDS"
+      ],
+      "complexity": 5,
+      "filePath": "docs/11-入侵检测与网络安全方案.md"
+    },
+    {
+      "id": "document:12",
+      "type": "document",
+      "name": "12-方法论与设计原则",
+      "summary": "思想/原理/原则/方法/标准/步骤六层方法论，落地映射与自检清单",
+      "tags": [
+        "方法论",
+        "原则"
+      ],
+      "complexity": 4,
+      "filePath": "docs/12-方法论与设计原则.md"
+    },
+    {
+      "id": "document:13",
+      "type": "document",
+      "name": "13-Git钩子与分支保护",
+      "summary": "pre-commit/pre-push 钩子+Gitea 分支保护+CI 演进",
+      "tags": [
+        "Git",
+        "钩子",
+        "分支保护"
+      ],
+      "complexity": 3,
+      "filePath": "docs/13-Git钩子与分支保护.md"
+    },
+    {
+      "id": "document:14",
+      "type": "document",
+      "name": "14-技能矩阵与能力评估",
+      "summary": "十一大技能域、五级能力评估、角色映射、缺口建设",
+      "tags": [
+        "技能",
+        "评估"
+      ],
+      "complexity": 3,
+      "filePath": "docs/14-技能矩阵与能力评估.md"
+    },
+    {
+      "id": "config:prometheus",
+      "type": "config",
+      "name": "prometheus.yml",
+      "summary": "Prometheus 主配置：K8s SD+remote_write+rule_files 挂载全部告警规则",
+      "tags": [
+        "监控",
+        "采集"
+      ],
+      "complexity": 4,
+      "filePath": "configs/prometheus.yml"
+    },
+    {
+      "id": "config:alertmanager",
+      "type": "config",
+      "name": "alertmanager.yml",
+      "summary": "Alertmanager 四级路由(P0-P3)+抑制规则+企微/钉钉/飞书通知",
+      "tags": [
+        "告警",
+        "路由"
+      ],
+      "complexity": 3,
+      "filePath": "configs/alertmanager.yml"
+    },
+    {
+      "id": "config:promtail",
+      "type": "config",
+      "name": "promtail.yml",
+      "summary": "Promtail 日志采集配置，按 job 分标签",
+      "tags": [
+        "日志",
+        "采集"
+      ],
+      "complexity": 3,
+      "filePath": "configs/promtail.yml"
+    },
+    {
+      "id": "config:blackbox",
+      "type": "config",
+      "name": "blackbox.yml",
+      "summary": "Blackbox Exporter 探活配置(HTTP/TCP/ICMP)",
+      "tags": [
+        "探活",
+        "监控"
+      ],
+      "complexity": 2,
+      "filePath": "configs/blackbox.yml"
+    },
+    {
+      "id": "config:compose",
+      "type": "config",
+      "name": "docker-compose-monitoring.yml",
+      "summary": "监控平台一键部署：Prometheus+Grafana+Loki+VM+Blackbox+Wazuh 三件套",
+      "tags": [
+        "部署",
+        "Docker"
+      ],
+      "complexity": 4,
+      "filePath": "configs/docker-compose-monitoring.yml"
+    },
+    {
+      "id": "config:wazuh",
+      "type": "config",
+      "name": "ossec.conf",
+      "summary": "Wazuh Manager 配置：FIM+rootkit+主动响应+日志分析",
+      "tags": [
+        "安全",
+        "HIDS"
+      ],
+      "complexity": 4,
+      "filePath": "configs/wazuh/ossec.conf"
+    },
+    {
+      "id": "config:grafana-ds",
+      "type": "config",
+      "name": "datasources.yml",
+      "summary": "Grafana 数据源自动配置(Prometheus/Loki/Tempo)",
+      "tags": [
+        "Grafana",
+        "数据源"
+      ],
+      "complexity": 2,
+      "filePath": "configs/grafana/provisioning/datasources/datasources.yml"
+    },
+    {
+      "id": "config:grafana-db",
+      "type": "config",
+      "name": "dashboards.yml",
+      "summary": "Grafana 看板自动加载配置",
+      "tags": [
+        "Grafana",
+        "看板"
+      ],
+      "complexity": 2,
+      "filePath": "configs/grafana/provisioning/dashboards/dashboards.yml"
+    },
+    {
+      "id": "config:rule-host",
+      "type": "config",
+      "name": "rules/host.yml",
+      "summary": "主机告警规则 11 条：CPU/内存/磁盘/负载/inode/NTP",
+      "tags": [
+        "告警",
+        "主机"
+      ],
+      "complexity": 3,
+      "filePath": "configs/rules/host.yml"
+    },
+    {
+      "id": "config:rule-mysql",
+      "type": "config",
+      "name": "rules/mysql.yml",
+      "summary": "MySQL 告警 8 条：连接数/复制/慢查询/连接错误",
+      "tags": [
+        "告警",
+        "MySQL"
+      ],
+      "complexity": 3,
+      "filePath": "configs/rules/mysql.yml"
+    },
+    {
+      "id": "config:rule-redis",
+      "type": "config",
+      "name": "rules/redis.yml",
+      "summary": "Redis 告警 7 条：内存/连接/持久化/命中率",
+      "tags": [
+        "告警",
+        "Redis"
+      ],
+      "complexity": 3,
+      "filePath": "configs/rules/redis.yml"
+    },
+    {
+      "id": "config:rule-k8s",
+      "type": "config",
+      "name": "rules/k8s.yml",
+      "summary": "K8s 告警 9 条：Pod 状态/节点就绪/重启/API 延迟",
+      "tags": [
+        "告警",
+        "K8s"
+      ],
+      "complexity": 3,
+      "filePath": "configs/rules/k8s.yml"
+    },
+    {
+      "id": "config:rule-network",
+      "type": "config",
+      "name": "rules/network.yml",
+      "summary": "网络探活告警 6 条：HTTP/TCP/ICMP 可达性",
+      "tags": [
+        "告警",
+        "网络"
+      ],
+      "complexity": 2,
+      "filePath": "configs/rules/network.yml"
+    },
+    {
+      "id": "config:rule-security",
+      "type": "config",
+      "name": "rules/security.yml",
+      "summary": "安全告警 27 条：入侵/异常连接/暴力破解/容器安全/审计",
+      "tags": [
+        "告警",
+        "安全"
+      ],
+      "complexity": 5,
+      "filePath": "configs/rules/security.yml"
+    },
+    {
+      "id": "service:k8s-netpol",
+      "type": "service",
+      "name": "network-policies.yaml",
+      "summary": "K8s 网络策略：默认拒绝+按命名空间隔离",
+      "tags": [
+        "K8s",
+        "网络隔离"
+      ],
+      "complexity": 3,
+      "filePath": "configs/k8s/network-policies.yaml"
+    },
+    {
+      "id": "service:k8s-podsec",
+      "type": "service",
+      "name": "pod-security.yaml",
+      "summary": "Pod Security Standards restricted 级别",
+      "tags": [
+        "K8s",
+        "安全"
+      ],
+      "complexity": 3,
+      "filePath": "configs/k8s/pod-security.yaml"
+    },
+    {
+      "id": "service:k8s-quota",
+      "type": "service",
+      "name": "resource-quotas.yaml",
+      "summary": "K8s 资源配额限制(FinOps)",
+      "tags": [
+        "K8s",
+        "配额"
+      ],
+      "complexity": 2,
+      "filePath": "configs/k8s/resource-quotas.yaml"
+    },
+    {
+      "id": "config:target-nodes",
+      "type": "config",
+      "name": "targets/nodes.yml",
+      "summary": "主机 node_exporter 采集目标(100 台)",
+      "tags": [
+        "采集",
+        "主机"
+      ],
+      "complexity": 2,
+      "filePath": "configs/targets/nodes.yml"
+    },
+    {
+      "id": "config:target-mysql",
+      "type": "config",
+      "name": "targets/mysql.yml",
+      "summary": "MySQL exporter 采集目标",
+      "tags": [
+        "采集",
+        "MySQL"
+      ],
+      "complexity": 2,
+      "filePath": "configs/targets/mysql.yml"
+    },
+    {
+      "id": "config:target-redis",
+      "type": "config",
+      "name": "targets/redis.yml",
+      "summary": "Redis exporter 采集目标",
+      "tags": [
+        "采集",
+        "Redis"
+      ],
+      "complexity": 2,
+      "filePath": "configs/targets/redis.yml"
+    },
+    {
+      "id": "config:target-nginx",
+      "type": "config",
+      "name": "targets/nginx.yml",
+      "summary": "Nginx exporter 采集目标",
+      "tags": [
+        "采集",
+        "Nginx"
+      ],
+      "complexity": 2,
+      "filePath": "configs/targets/nginx.yml"
+    },
+    {
+      "id": "config:target-bbhttp",
+      "type": "config",
+      "name": "targets/blackbox_http.yml",
+      "summary": "Blackbox HTTP 探活目标",
+      "tags": [
+        "探活",
+        "HTTP"
+      ],
+      "complexity": 1,
+      "filePath": "configs/targets/blackbox_http.yml"
+    },
+    {
+      "id": "config:target-bbtcp",
+      "type": "config",
+      "name": "targets/blackbox_tcp.yml",
+      "summary": "Blackbox TCP 探活目标",
+      "tags": [
+        "探活",
+        "TCP"
+      ],
+      "complexity": 1,
+      "filePath": "configs/targets/blackbox_tcp.yml"
+    },
+    {
+      "id": "config:target-bbicmp",
+      "type": "config",
+      "name": "targets/blackbox_icmp.yml",
+      "summary": "Blackbox ICMP 探活目标",
+      "tags": [
+        "探活",
+        "ICMP"
+      ],
+      "complexity": 1,
+      "filePath": "configs/targets/blackbox_icmp.yml"
+    },
+    {
+      "id": "pipeline:00-init",
+      "type": "pipeline",
+      "name": "00-init-host.yml",
+      "summary": "新机初始化：用户/SSH/时间同步/基础包/监控 agent",
+      "tags": [
+        "初始化",
+        "Ansible"
+      ],
+      "complexity": 4,
+      "filePath": "playbooks/00-init-host.yml"
+    },
+    {
+      "id": "pipeline:01-baseline",
+      "type": "pipeline",
+      "name": "01-system-baseline.yml",
+      "summary": "安全基线加固：内核参数/sudo/防火墙/审计(CIS)",
+      "tags": [
+        "基线",
+        "加固"
+      ],
+      "complexity": 4,
+      "filePath": "playbooks/01-system-baseline.yml"
+    },
+    {
+      "id": "pipeline:02-mysql",
+      "type": "pipeline",
+      "name": "02-mysql-maintenance.yml",
+      "summary": "MySQL 运维：备份/慢查询/主从检查",
+      "tags": [
+        "MySQL",
+        "运维"
+      ],
+      "complexity": 3,
+      "filePath": "playbooks/02-mysql-maintenance.yml"
+    },
+    {
+      "id": "pipeline:03-k8s",
+      "type": "pipeline",
+      "name": "03-k8s-node-maintenance.yml",
+      "summary": "K8s 节点维护：排空/升级/恢复",
+      "tags": [
+        "K8s",
+        "维护"
+      ],
+      "complexity": 3,
+      "filePath": "playbooks/03-k8s-node-maintenance.yml"
+    },
+    {
+      "id": "pipeline:04-security",
+      "type": "pipeline",
+      "name": "04-security-monitoring.yml",
+      "summary": "安全监控部署：Wazuh Agent+Suricata+fail2ban+auditd+主机隔离",
+      "tags": [
+        "安全",
+        "部署"
+      ],
+      "complexity": 5,
+      "filePath": "playbooks/04-security-monitoring.yml"
+    },
+    {
+      "id": "pipeline:deploy-ne",
+      "type": "pipeline",
+      "name": "deploy_node_exporter.yml",
+      "summary": "部署 node_exporter 监控 agent",
+      "tags": [
+        "部署",
+        "监控"
+      ],
+      "complexity": 2,
+      "filePath": "playbooks/deploy_node_exporter.yml"
+    },
+    {
+      "id": "config:ansible-cfg",
+      "type": "config",
+      "name": "ansible.cfg",
+      "summary": "Ansible 全局配置：并发/facts 缓存/vault/ssh",
+      "tags": [
+        "Ansible",
+        "配置"
+      ],
+      "complexity": 2,
+      "filePath": "playbooks/ansible.cfg"
+    },
+    {
+      "id": "config:inventory",
+      "type": "config",
+      "name": "inventory_example.ini",
+      "summary": "主机清单：按发行版/角色/云来源分组(16 组)",
+      "tags": [
+        "inventory",
+        "分组"
+      ],
+      "complexity": 2,
+      "filePath": "playbooks/inventory_example.ini"
+    },
+    {
+      "id": "config:tpl-chrony",
+      "type": "config",
+      "name": "chrony.conf.j2",
+      "summary": "Chrony 时间同步配置模板",
+      "tags": [
+        "模板",
+        "NTP"
+      ],
+      "complexity": 1,
+      "filePath": "playbooks/templates/chrony.conf.j2"
+    },
+    {
+      "id": "config:tpl-wazuh",
+      "type": "config",
+      "name": "wazuh-agent.conf.j2",
+      "summary": "Wazuh Agent 配置模板：FIM/rootkit/主动响应",
+      "tags": [
+        "模板",
+        "Wazuh"
+      ],
+      "complexity": 4,
+      "filePath": "playbooks/templates/wazuh-agent.conf.j2"
+    },
+    {
+      "id": "script:daily-health",
+      "type": "script",
+      "name": "daily_health_check.sh",
+      "summary": "每日主机巡检：负载/磁盘/内存/进程/日志/NTP/网络",
+      "tags": [
+        "巡检",
+        "主机"
+      ],
+      "complexity": 3,
+      "filePath": "scripts/daily_health_check.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:db-health",
+      "type": "script",
+      "name": "db_health_check.sh",
+      "summary": "数据库巡检：MySQL/TiDB/Redis 连接与状态",
+      "tags": [
+        "巡检",
+        "数据库"
+      ],
+      "complexity": 3,
+      "filePath": "scripts/db_health_check.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:k8s-health",
+      "type": "script",
+      "name": "k8s_health_check.sh",
+      "summary": "K8s 巡检：节点/Pod/组件健康",
+      "tags": [
+        "巡检",
+        "K8s"
+      ],
+      "complexity": 3,
+      "filePath": "scripts/k8s_health_check.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:intrusion",
+      "type": "script",
+      "name": "intrusion_detection.sh",
+      "summary": "入侵检测：反向Shell/rootkit/持久化后门/异常用户(每10分钟)",
+      "tags": [
+        "安全",
+        "入侵检测"
+      ],
+      "complexity": 5,
+      "filePath": "scripts/intrusion_detection.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:net-anomaly",
+      "type": "script",
+      "name": "network_anomaly_check.sh",
+      "summary": "网络异常检测：异常出站/新增端口/威胁情报/横向移动(每5分钟)",
+      "tags": [
+        "安全",
+        "网络异常"
+      ],
+      "complexity": 5,
+      "filePath": "scripts/network_anomaly_check.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:threat-intel",
+      "type": "script",
+      "name": "threat_intel_update.sh",
+      "summary": "威胁情报更新：AbuseIPDB/OTX/矿池黑名单(每日)",
+      "tags": [
+        "安全",
+        "威胁情报"
+      ],
+      "complexity": 4,
+      "filePath": "scripts/threat_intel_update.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:mysql-backup",
+      "type": "script",
+      "name": "mysql_full_backup.sh",
+      "summary": "MySQL 全量备份：xtrabackup+压缩+S3 上传+指标",
+      "tags": [
+        "备份",
+        "MySQL"
+      ],
+      "complexity": 4,
+      "filePath": "scripts/mysql_full_backup.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:redis-backup",
+      "type": "script",
+      "name": "redis_backup.sh",
+      "summary": "Redis 备份：RDB/AOF+S3 上传",
+      "tags": [
+        "备份",
+        "Redis"
+      ],
+      "complexity": 3,
+      "filePath": "scripts/redis_backup.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:tidb-backup",
+      "type": "script",
+      "name": "tidb_backup.sh",
+      "summary": "TiDB 备份：BR 工具+S3 上传",
+      "tags": [
+        "备份",
+        "TiDB"
+      ],
+      "complexity": 3,
+      "filePath": "scripts/tidb_backup.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:etcd-backup",
+      "type": "script",
+      "name": "etcd_backup.sh",
+      "summary": "etcd 备份：快照+S3 上传",
+      "tags": [
+        "备份",
+        "etcd"
+      ],
+      "complexity": 3,
+      "filePath": "scripts/etcd_backup.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:cert-check",
+      "type": "script",
+      "name": "cert_check.sh",
+      "summary": "证书到期检查：提前 30 天告警",
+      "tags": [
+        "证书",
+        "监控"
+      ],
+      "complexity": 2,
+      "filePath": "scripts/cert_check.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "script:log-cleanup",
+      "type": "script",
+      "name": "log_cleanup.sh",
+      "summary": "日志清理：按保留策略清理旧日志",
+      "tags": [
+        "日志",
+        "清理"
+      ],
+      "complexity": 2,
+      "filePath": "scripts/log_cleanup.sh",
+      "languageNotes": "Bash, set -euo pipefail, 幂等设计"
+    },
+    {
+      "id": "config:gitignore",
+      "type": "config",
+      "name": ".gitignore",
+      "summary": "Git 忽略：编辑器临时文件/Ansible retry/vault/密钥",
+      "tags": [
+        "Git",
+        "忽略"
+      ],
+      "complexity": 1,
+      "filePath": ".gitignore"
+    },
+    {
+      "id": "document:AGENTS",
+      "type": "document",
+      "name": "AGENTS.md",
+      "summary": "仓库贡献指南(中文)：结构/校验/风格/提交/安全/架构",
+      "tags": [
+        "规范",
+        "贡献"
+      ],
+      "complexity": 2,
+      "filePath": "AGENTS.md"
+    },
+    {
+      "id": "document:AGENTS-en",
+      "type": "document",
+      "name": "AGENTS-en.md",
+      "summary": "仓库贡献指南(英文)",
+      "tags": [
+        "规范",
+        "贡献"
+      ],
+      "complexity": 2,
+      "filePath": "AGENTS-en.md"
+    },
+    {
+      "id": "script:pre-commit",
+      "type": "script",
+      "name": "hooks/pre-commit",
+      "summary": "提交前钩子：Shell/YAML/权限/密钥/Playbook 校验",
+      "tags": [
+        "Git",
+        "钩子"
+      ],
+      "complexity": 4,
+      "filePath": "hooks/pre-commit"
+    },
+    {
+      "id": "script:pre-push",
+      "type": "script",
+      "name": "hooks/pre-push",
+      "summary": "推送前钩子：复跑校验+推送摘要",
+      "tags": [
+        "Git",
+        "钩子"
+      ],
+      "complexity": 3,
+      "filePath": "hooks/pre-push"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:prometheus",
+      "target": "config:rule-host",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:rule-mysql",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:rule-redis",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:rule-k8s",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:rule-network",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:rule-security",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:target-nodes",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:target-mysql",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:target-redis",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:target-nginx",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:prometheus",
+      "target": "config:alertmanager",
+      "type": "triggers",
+      "direction": "downstream",
+      "weight": 0.8
+    },
+    {
+      "source": "config:compose",
+      "target": "config:prometheus",
+      "type": "deploys",
+      "direction": "downstream",
+      "weight": 0.8
+    },
+    {
+      "source": "config:compose",
+      "target": "config:alertmanager",
+      "type": "deploys",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:compose",
+      "target": "config:promtail",
+      "type": "deploys",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:compose",
+      "target": "config:blackbox",
+      "type": "deploys",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:compose",
+      "target": "config:wazuh",
+      "type": "deploys",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:compose",
+      "target": "config:grafana-ds",
+      "type": "deploys",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:compose",
+      "target": "config:grafana-db",
+      "type": "deploys",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:grafana-ds",
+      "target": "config:prometheus",
+      "type": "depends_on",
+      "direction": "downstream",
+      "weight": 0.6
+    },
+    {
+      "source": "config:grafana-ds",
+      "target": "config:promtail",
+      "type": "depends_on",
+      "direction": "downstream",
+      "weight": 0.6
+    },
+    {
+      "source": "document:README",
+      "target": "document:00",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:00",
+      "target": "document:01",
+      "type": "related",
+      "direction": "downstream",
+      "weight": 0.5
+    },
+    {
+      "source": "document:00",
+      "target": "document:11",
+      "type": "related",
+      "direction": "downstream",
+      "weight": 0.5
+    },
+    {
+      "source": "document:00",
+      "target": "document:12",
+      "type": "related",
+      "direction": "downstream",
+      "weight": 0.5
+    },
+    {
+      "source": "document:12",
+      "target": "document:14",
+      "type": "related",
+      "direction": "downstream",
+      "weight": 0.5
+    },
+    {
+      "source": "document:13",
+      "target": "script:pre-commit",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:13",
+      "target": "script:pre-push",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:03",
+      "target": "pipeline:00-init",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:03",
+      "target": "pipeline:01-baseline",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:06",
+      "target": "pipeline:01-baseline",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:11",
+      "target": "pipeline:04-security",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "pipeline:04-security",
+      "target": "config:tpl-wazuh",
+      "type": "depends_on",
+      "direction": "downstream",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:00-init",
+      "target": "config:tpl-chrony",
+      "type": "depends_on",
+      "direction": "downstream",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:00-init",
+      "target": "pipeline:deploy-ne",
+      "type": "related",
+      "direction": "downstream",
+      "weight": 0.5
+    },
+    {
+      "source": "document:11",
+      "target": "script:intrusion",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:11",
+      "target": "script:net-anomaly",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:11",
+      "target": "script:threat-intel",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "script:net-anomaly",
+      "target": "script:threat-intel",
+      "type": "depends_on",
+      "direction": "downstream",
+      "weight": 0.6
+    },
+    {
+      "source": "document:07",
+      "target": "script:mysql-backup",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:07",
+      "target": "script:redis-backup",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:07",
+      "target": "script:tidb-backup",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:07",
+      "target": "script:etcd-backup",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:04",
+      "target": "script:mysql-backup",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:09",
+      "target": "script:daily-health",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:09",
+      "target": "script:db-health",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:09",
+      "target": "script:k8s-health",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:05",
+      "target": "service:k8s-netpol",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:05",
+      "target": "service:k8s-podsec",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "document:05",
+      "target": "service:k8s-quota",
+      "type": "documents",
+      "direction": "downstream",
+      "weight": 0.7
+    },
+    {
+      "source": "config:inventory",
+      "target": "pipeline:00-init",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.6
+    },
+    {
+      "source": "config:inventory",
+      "target": "pipeline:01-baseline",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.6
+    },
+    {
+      "source": "config:ansible-cfg",
+      "target": "pipeline:00-init",
+      "type": "configures",
+      "direction": "downstream",
+      "weight": 0.5
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:docs",
+      "name": "方案文档层",
+      "description": "16 篇编号文档，从总体架构到方法论，定义系统设计意图与规范",
+      "nodeIds": [
+        "document:README",
+        "document:00",
+        "document:01",
+        "document:02",
+        "document:03",
+        "document:04",
+        "document:05",
+        "document:06",
+        "document:07",
+        "document:08",
+        "document:09",
+        "document:10",
+        "document:11",
+        "document:12",
+        "document:13",
+        "document:14",
+        "document:AGENTS",
+        "document:AGENTS-en"
+      ]
+    },
+    {
+      "id": "layer:monitoring",
+      "name": "监控告警层",
+      "description": "Prometheus 采集+告警规则+Alertmanager 路由+Grafana 展示",
+      "nodeIds": [
+        "config:prometheus",
+        "config:alertmanager",
+        "config:rule-host",
+        "config:rule-mysql",
+        "config:rule-redis",
+        "config:rule-k8s",
+        "config:rule-network",
+        "config:rule-security",
+        "config:target-nodes",
+        "config:target-mysql",
+        "config:target-redis",
+        "config:target-nginx",
+        "config:target-bbhttp",
+        "config:target-bbtcp",
+        "config:target-bbicmp",
+        "config:grafana-ds",
+        "config:grafana-db",
+        "config:blackbox",
+        "script:cert-check"
+      ]
+    },
+    {
+      "id": "layer:logging",
+      "name": "日志采集层",
+      "description": "Loki+Promtail 日志收集与清理",
+      "nodeIds": [
+        "config:promtail",
+        "script:log-cleanup"
+      ]
+    },
+    {
+      "id": "layer:config",
+      "name": "配置管理层",
+      "description": "Ansible Playbook+模板+inventory，基础设施即代码",
+      "nodeIds": [
+        "pipeline:00-init",
+        "pipeline:01-baseline",
+        "pipeline:02-mysql",
+        "pipeline:03-k8s",
+        "pipeline:deploy-ne",
+        "config:tpl-chrony",
+        "config:tpl-wazuh",
+        "config:ansible-cfg",
+        "config:inventory"
+      ]
+    },
+    {
+      "id": "layer:security",
+      "name": "安全防护层",
+      "description": "入侵检测+网络异常+威胁情报+Wazuh HIDS+K8s 安全策略",
+      "nodeIds": [
+        "config:wazuh",
+        "pipeline:04-security",
+        "script:intrusion",
+        "script:net-anomaly",
+        "script:threat-intel",
+        "service:k8s-netpol",
+        "service:k8s-podsec"
+      ]
+    },
+    {
+      "id": "layer:backup",
+      "name": "备份容灾层",
+      "description": "MySQL/TiDB/Redis/etcd 多层次备份",
+      "nodeIds": [
+        "script:mysql-backup",
+        "script:redis-backup",
+        "script:tidb-backup",
+        "script:etcd-backup"
+      ]
+    },
+    {
+      "id": "layer:ops",
+      "name": "自动化巡检层",
+      "description": "主机/数据库/K8s 巡检脚本",
+      "nodeIds": [
+        "script:daily-health",
+        "script:db-health",
+        "script:k8s-health"
+      ]
+    },
+    {
+      "id": "layer:eng",
+      "name": "工程规范层",
+      "description": "Git 钩子+贡献指南+忽略规则，质量保障闸门",
+      "nodeIds": [
+        "script:pre-commit",
+        "script:pre-push",
+        "config:gitignore",
+        "document:AGENTS",
+        "document:AGENTS-en"
+      ]
+    },
+    {
+      "id": "layer:deploy",
+      "name": "部署编排层",
+      "description": "Docker Compose 一键部署监控平台",
+      "nodeIds": [
+        "config:compose"
+      ]
+    },
+    {
+      "id": "layer:k8s",
+      "name": "K8s 治理层",
+      "description": "网络策略+Pod 安全+资源配额",
+      "nodeIds": [
+        "service:k8s-netpol",
+        "service:k8s-podsec",
+        "service:k8s-quota"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "全局鸟瞰",
+      "description": "从总体架构理解整个运维体系的设计意图与七层分层",
+      "nodeIds": [
+        "document:00",
+        "document:README"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "方法论根基",
+      "description": "理解方案背后的思想/原理/原则，知道为什么这样设计",
+      "nodeIds": [
+        "document:12"
+      ]
+    },
+    {
+      "order": 3,
+      "title": "监控告警主线",
+      "description": "从采集到告警的完整链路：Prometheus 加载规则与目标，触发 Alertmanager",
+      "nodeIds": [
+        "config:prometheus",
+        "config:rule-host",
+        "config:rule-security",
+        "config:alertmanager"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "安全纵深防御",
+      "description": "入侵检测与网络安全方案，理解七层防御与 ATT&CK 覆盖",
+      "nodeIds": [
+        "document:11",
+        "config:wazuh",
+        "script:intrusion",
+        "script:net-anomaly",
+        "pipeline:04-security"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "配置管理 IaC",
+      "description": "Ansible 如何纳管异构主机，Playbook 编号与模板",
+      "nodeIds": [
+        "document:03",
+        "config:inventory",
+        "pipeline:00-init",
+        "pipeline:01-baseline"
+      ]
+    },
+    {
+      "order": 6,
+      "title": "备份容灾体系",
+      "description": "3-2-1 备份原则的脚本化实现",
+      "nodeIds": [
+        "document:07",
+        "script:mysql-backup",
+        "script:tidb-backup"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "质量保障闸门",
+      "description": "Git 钩子如何守住代码质量，分支保护如何守住主干",
+      "nodeIds": [
+        "document:13",
+        "script:pre-commit",
+        "script:pre-push"
+      ]
+    },
+    {
+      "order": 8,
+      "title": "能力与复用",
+      "description": "技能矩阵评估与项目复用自检",
+      "nodeIds": [
+        "document:14"
+      ]
+    },
+    {
+      "order": 9,
+      "title": "落地路线",
+      "description": "4 阶段 12 周如何分步落地",
+      "nodeIds": [
+        "document:10"
+      ]
+    }
+  ]
+}
