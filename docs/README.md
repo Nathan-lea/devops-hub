@@ -1,7 +1,7 @@
 # 服务器运维系统方案
 
 > 针对 100 台左右 Linux 服务器（多云异构）的全面运维方案
-> 涵盖 Debian / Ubuntu / CentOS、MySQL / TiDB / Redis、K8s 集群
+> 涵盖 Debian / Ubuntu / CentOS、MySQL / TiDB / Redis / PostgreSQL、K8s 集群
 > 包含监控、日志、配置管理、数据库运维、K8s运维、安全合规、入侵检测、备份容灾、告警应急、自动化
 
 ## 快速导航
@@ -12,7 +12,7 @@
 | [01-监控体系方案](01-监控体系方案.md) | Prometheus + Grafana + exporter |
 | [02-日志管理方案](02-日志管理方案.md) | Loki + Promtail 日志收集 |
 | [03-配置管理方案](03-配置管理方案.md) | Ansible 主机分组与 Playbook |
-| [04-数据库运维方案](04-数据库运维方案.md) | MySQL / TiDB / Redis 运维 |
+| [04-数据库运维方案](04-数据库运维方案.md) | MySQL / TiDB / Redis / PostgreSQL 运维 |
 | [05-K8s运维方案](05-K8s运维方案.md) | 集群管理、升级、故障排查 |
 | [06-安全合规方案](06-安全合规方案.md) | 基线、漏洞、权限审计 |
 | [07-备份与容灾方案](07-备份与容灾方案.md) | 多层次备份与恢复演练 |
@@ -56,6 +56,7 @@ devops-hub/
 │   │   ├── host.yml               # 主机告警
 │   │   ├── mysql.yml              # MySQL 告警
 │   │   ├── redis.yml              # Redis 告警
+│   │   ├── postgresql.yml          # PostgreSQL 告警
 │   │   ├── k8s.yml                # K8s 告警
 │   │   ├── network.yml            # 网络探活告警
 │   │   └── security.yml           # 安全告警（入侵/异常连接/暴力破解/容器安全/审计）
@@ -81,6 +82,7 @@ devops-hub/
 │   ├── 00-init-host.yml           # 新机初始化
 │   ├── 01-system-baseline.yml     # 安全基线加固
 │   ├── 02-mysql-maintenance.yml   # MySQL 运维
+│   ├── 02-postgresql-maintenance.yml # PostgreSQL 运维
 │   ├── 03-k8s-node-maintenance.yml# K8s 节点维护
 │   ├── 04-security-monitoring.yml # 安全监控部署（Wazuh+Suricata+fail2ban+入侵检测）
 │   ├── deploy_node_exporter.yml   # 部署监控 agent
@@ -141,7 +143,7 @@ devops-hub/
 │   网络分段 │ 入站/出站管控 │ 端口最小化                    │
 ├──────────────────────────────────────────────────────────┤
 │                    被保护主机层                            │
-│   公有云 │ 私有云 │ 物理机 │ K8s │ MySQL/TiDB/Redis       │
+│   公有云 │ 私有云 │ 物理机 │ K8s │ MySQL/TiDB/Redis/PG    │
 └──────────────────────────────────────────────────────────┘
 ```
 

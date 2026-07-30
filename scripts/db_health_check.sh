@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # 数据库健康巡检脚本
-# 支持 MySQL、Redis（TiDB 通过 Prometheus 监控）
+# 支持 MySQL、PostgreSQL、Redis（TiDB 通过 Prometheus 监控）
 # ============================================================
 
 set -euo pipefail
@@ -135,7 +135,92 @@ if command -v redis-cli >/dev/null 2>&1; then
   echo "  [INFO] RDB 最后备份状态: ${RDB_STATUS:-unknown}"
 fi
 
+# ---------- PostgreSQL 巡检 ----------
+if command -v psql >/dev/null 2>&1; then
+  echo ""
+  echo "【PostgreSQL 巡检】"
+  PG_HOST="${PG_HOST:-127.0.0.1}"
+  PG_PORT="${PG_PORT:-5432}"
+  PG_USER="${PG_USER:-monitor}"
+  export PGPASSWORD="${PG_PASS:-}"
+
+  if [ -z "${PG_PASS:-}" ]; then
+    echo "  [INFO] 未设置 PG_PASS，跳过 PostgreSQL 巡检"
+  else
+    # 实例存活
+    if psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -Atqc "SELECT 1" >/dev/null 2>&1; then
+      echo "  [OK] PostgreSQL 实例存活"
+    else
+      echo "  [CRIT] PostgreSQL 实例无响应！"
+    fi
+
+    # 连接数
+    CONN_USED=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -Atqc \
+      "SELECT count(*) FROM pg_stat_activity" 2>/dev/null)
+    MAX_CONN=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -Atqc \
+      "SELECT setting::int FROM pg_settings WHERE name='max_connections'" 2>/dev/null)
+    if [ -n "$CONN_USED" ] && [ -n "$MAX_CONN" ] && [ "$MAX_CONN" -gt 0 ]; then
+      PCT=$((CONN_USED * 100 / MAX_CONN))
+      if (( PCT > 80 )); then
+        echo "  [WARN] 连接数 ${CONN_USED}/${MAX_CONN} (${PCT}%)"
+      else
+        echo "  [OK] 连接数 ${CONN_USED}/${MAX_CONN} (${PCT}%)"
+      fi
+    fi
+
+    # idle in transaction（持锁不释放）
+    IDLE_TXN=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -Atqc \
+      "SELECT count(*) FROM pg_stat_activity WHERE state='idle in transaction'" 2>/dev/null)
+    if [ -n "$IDLE_TXN" ] && (( IDLE_TXN > 10 )); then
+      echo "  [WARN] idle in transaction 会话数: ${IDLE_TXN}（>10，长期持锁风险）"
+    else
+      echo "  [OK] idle in transaction 会话数: ${IDLE_TXN:-0}"
+    fi
+
+    # 流复制状态
+    REPL=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -Atqc \
+      "SELECT client_addr, state, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)
+       FROM pg_stat_replication" 2>/dev/null)
+    if [ -n "$REPL" ]; then
+      echo "  [INFO] 流复制备库:"
+      echo "$REPL" | while IFS='|' read -r addr state lag; do
+        echo "    ${addr:-N/A}  状态=${state:-N/A}  延迟=${lag:-0} 字节"
+      done
+    else
+      echo "  [INFO] 非主节点或无流复制备库连接"
+    fi
+
+    # 死锁与回滚统计
+    DEADLOCKS=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -Atqc \
+      "SELECT sum(deadlocks) FROM pg_stat_database" 2>/dev/null)
+    ROLLBACKS=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -Atqc \
+      "SELECT sum(xact_rollback) FROM pg_stat_database" 2>/dev/null)
+    echo "  [INFO] 累计死锁数: ${DEADLOCKS:-0}  累计回滚数: ${ROLLBACKS:-0}"
+
+    # 缓冲池命中率
+    HIT_RATE=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -Atqc \
+      "SELECT round(sum(blks_hit)::numeric / nullif(sum(blks_hit)+sum(blks_read),0) * 100, 2)
+       FROM pg_stat_database" 2>/dev/null)
+    if [ -n "$HIT_RATE" ]; then
+      if (( $(echo "$HIT_RATE < 95" | bc -l 2>/dev/null || echo 0) )); then
+        echo "  [WARN] 缓冲池命中率: ${HIT_RATE}%（<95%）"
+      else
+        echo "  [OK] 缓冲池命中率: ${HIT_RATE}%"
+      fi
+    fi
+
+    # 数据库大小 TOP5
+    echo "  [INFO] 数据库大小 TOP5："
+    psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -c \
+      "SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size
+       FROM pg_database WHERE datistemplate=false
+       ORDER BY pg_database_size(datname) DESC LIMIT 5;" 2>/dev/null | sed 's/^/    /'
+  fi
+  unset PGPASSWORD
+fi
+
 echo ""
+echo "============================================================"
 echo "============================================================"
 echo "  巡检完成：$(date '+%Y-%m-%d %H:%M:%S')"
 echo "============================================================"

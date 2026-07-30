@@ -1,0 +1,180 @@
+---
+# Playbook: PostgreSQL 日常运维
+# 功能：备份、流复制检查、VACUUM 分析、WAL 清理
+
+- name: PostgreSQL 日常运维
+  hosts: postgresql
+  become: yes
+  vars:
+    pg_backup_user: "backup"
+    pg_backup_pass: "{{ vault_pg_backup_pass }}"
+    pg_monitor_user: "monitor"
+    pg_monitor_pass: "{{ vault_pg_monitor_pass }}"
+    pg_host: "127.0.0.1"
+    pg_port: 5432
+    backup_dir: "/data/backup/postgresql"
+    s3_bucket: "s3://db-backup/postgresql"
+
+  tasks:
+    # ========== 1. 创建监控账号 ==========
+    - name: 创建 PostgreSQL 监控账号
+      community.postgresql.postgresql_user:
+        name: "{{ pg_monitor_user }}"
+        password: "{{ pg_monitor_pass }}"
+        role_attr_flags: "LOGIN"
+        groups: "pg_monitor"
+        state: present
+      become_user: postgres
+      run_once: true
+
+    # ========== 2. 创建备份账号 ==========
+    - name: 创建 PostgreSQL 备份账号
+      community.postgresql.postgresql_user:
+        name: "{{ pg_backup_user }}"
+        password: "{{ pg_backup_pass }}"
+        role_attr_flags: "LOGIN,REPLICATION"
+        state: present
+      become_user: postgres
+      run_once: true
+
+    # ========== 3. 全量逻辑备份 ==========
+    - name: 创建备份目录
+      file:
+        path: "{{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}"
+        state: directory
+        mode: "0750"
+
+    - name: 导出全局对象（pg_dumpall）
+      community.postgresql.postgresql_user:  # 占位，实际用 shell
+        name: "_skip"
+        state: absent
+      changed_when: false
+      failed_when: false
+
+    - name: 执行 pg_dumpall 全局对象备份
+      shell: |
+        export PGPASSWORD={{ pg_backup_pass }}
+        pg_dumpall -h {{ pg_host }} -p {{ pg_port }} -U {{ pg_backup_user }} \
+          --globals-only | gzip > \
+          {{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}/globals.sql.gz
+      args:
+        creates: "{{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}/globals.sql.gz"
+
+    - name: 逐库 pg_dump 备份
+      shell: |
+        export PGPASSWORD={{ pg_backup_pass }}
+        DBS=$(psql -h {{ pg_host }} -p {{ pg_port }} -U {{ pg_backup_user }} -Atqc \
+          "SELECT datname FROM pg_database WHERE datistemplate = false")
+        for DB in $DBS; do
+          pg_dump -h {{ pg_host }} -p {{ pg_port }} -U {{ pg_backup_user }} \
+            -d "$DB" -Fc -Z6 -f \
+            {{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}/${DB}.dump
+        done
+      args:
+        creates: "{{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}/postgres.dump"
+
+    - name: 上传备份到 S3
+      shell: |
+        rclone copy {{ backup_dir }}/{{ inventory_hostname }}/{{ ansible_date_time.date }} \
+          {{ s3_bucket }}/{{ inventory_hostname }}/{{ ansible_date_time.date }}/ --progress
+      async: 3600
+      poll: 0
+
+    # ========== 4. 清理过期备份 ==========
+    - name: 查找 7 天前本地备份
+      find:
+        paths: "{{ backup_dir }}/{{ inventory_hostname }}"
+        age: 7d
+        recurse: yes
+        file_type: directory
+      register: old_backups
+
+    - name: 删除过期备份
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"
+
+    # ========== 5. 流复制健康检查 ==========
+    - name: 检查流复制状态（主节点）
+      shell: |
+        export PGPASSWORD={{ pg_monitor_pass }}
+        psql -h {{ pg_host }} -p {{ pg_port }} -U {{ pg_monitor_user }} -Atqc \
+        "SELECT client_addr, state, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)
+         FROM pg_stat_replication"
+      register: repl_status
+      changed_when: false
+      failed_when: false
+
+    - name: 显示流复制状态
+      debug:
+        msg: "{{ repl_status.stdout_lines if repl_status.stdout_lines | length > 0 else ['无流复制备库连接（非主节点或无备库）'] }}"
+
+    # ========== 6. WAL 归档检查 ==========
+    - name: 检查 WAL 归档状态
+      shell: |
+        export PGPASSWORD={{ pg_monitor_pass }}
+        psql -h {{ pg_host }} -p {{ pg_port }} -U {{ pg_monitor_user }} -Atqc \
+        "SELECT archived_count, failed_count, last_archived_wal
+         FROM pg_stat_archiver"
+      register: wal_status
+      changed_when: false
+      failed_when: false
+
+    - name: 显示 WAL 归档状态
+      debug:
+        var: wal_status.stdout_lines
+
+    # ========== 7. VACUUM / 死元组分析 ==========
+    - name: 检查死元组 TOP10 表
+      shell: |
+        export PGPASSWORD={{ pg_monitor_pass }}
+        psql -h {{ pg_host }} -p {{ pg_port }} -U {{ pg_monitor_user }} -c \
+        "SELECT schemaname, relname, n_live_tup, n_dead_tup,
+                round(n_dead_tup::numeric / nullif(n_live_tup,0) * 100, 2) AS dead_pct,
+                last_autovacuum
+         FROM pg_stat_user_tables
+         WHERE n_dead_tup > 1000
+         ORDER BY n_dead_tup DESC LIMIT 10;"
+      register: vacuum_report
+      changed_when: false
+      failed_when: false
+
+    - name: 显示死元组分析
+      debug:
+        var: vacuum_report.stdout_lines
+
+    # ========== 8. 长事务检查 ==========
+    - name: 检查长事务（> 5 分钟）
+      shell: |
+        export PGPASSWORD={{ pg_monitor_pass }}
+        psql -h {{ pg_host }} -p {{ pg_port }} -U {{ pg_monitor_user }} -c \
+        "SELECT pid, now()-xact_start AS duration, state, query
+         FROM pg_stat_activity
+         WHERE xact_start IS NOT NULL
+           AND now() - xact_start > interval '5 minutes'
+         ORDER BY duration DESC LIMIT 10;"
+      register: long_txn
+      changed_when: false
+      failed_when: false
+
+    - name: 显示长事务
+      debug:
+        var: long_txn.stdout_lines
+
+    # ========== 9. 事务 ID 回卷风险检查 ==========
+    - name: 检查事务 ID 年龄（防回卷）
+      shell: |
+        export PGPASSWORD={{ pg_monitor_pass }}
+        psql -h {{ pg_host }} -p {{ pg_port }} -U {{ pg_monitor_user }} -c \
+        "SELECT datname, age(datfrozenxid) AS xid_age,
+                round(age(datfrozenxid)::numeric / 2000000000 * 100, 2) AS wrap_pct
+         FROM pg_database
+         ORDER BY xid_age DESC LIMIT 5;"
+      register: xid_age
+      changed_when: false
+      failed_when: false
+
+    - name: 显示事务 ID 年龄
+      debug:
+        var: xid_age.stdout_lines

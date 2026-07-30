@@ -1,0 +1,8 @@
+# PostgreSQL 采集目标（postgres_exporter 默认端口 9187）
+- targets:
+    - 10.0.3.10:9187
+    - 10.0.3.11:9187
+    - 10.0.3.12:9187
+  labels:
+    role: postgresql
+    env: production

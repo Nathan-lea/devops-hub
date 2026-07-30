@@ -6,6 +6,35 @@
 
 ---
 
+## [v0.4.0] - 2026-07-30
+
+### ✨ 新功能
+- **PostgreSQL 运维体系**：补充 PG 数据库纳管内容，与 MySQL/TiDB/Redis 达到同等覆盖度。
+  - **告警规则**：新增 `configs/rules/postgresql.yml`，8 条规则覆盖实例宕机、
+    流复制延迟、连接数过高、事务回滚率、idle in transaction、缓冲池命中率、
+    死锁、临时文件溢出（告警规则总数 68 -> 76 条）。
+  - **采集目标**：新增 `configs/targets/postgresql.yml`（postgres_exporter 端口 9187）。
+  - **备份脚本**：新增 `scripts/postgresql_backup.sh`，支持逻辑备份
+    （pg_dumpall + pg_dump -Fc）与物理备份（pg_basebackup），含 S3 上传校验
+    与 textfile 指标推送。
+  - **巡检脚本**：`scripts/db_health_check.sh` 新增 PostgreSQL 巡检段，检查
+    实例存活、连接数、idle in transaction、流复制状态、死锁/回滚统计、
+    缓冲池命中率、数据库大小。
+  - **维护 Playbook**：新增 `playbooks/02-postgresql-maintenance.yml`，涵盖
+    监控/备份账号创建、逻辑备份、S3 上传、过期清理、流复制检查、WAL 归档
+    检查、VACUUM 死元组分析、长事务检查、事务 ID 回卷风险检查。
+  - **Inventory**：`inventory_example.ini` 新增 `[postgresql]` 主机组
+    （pg-primary + 2 replica）并纳入 `prod:children`。
+
+### 📚 文档
+- **数据库运维方案**（`docs/04`）：新增"四、PostgreSQL 运维"章节
+  （架构建议 / 备份策略 / WAL 归档 / VACUUM 治理 / 关键参数基线 / 告警规则表），
+  后续章节顺延编号。
+- 同步更新 `docs/00`、`docs/12`、`docs/14`、`docs/README.md` 中数据库清单、
+  告警规则计数与技能矩阵，统一纳入 PostgreSQL。
+
+---
+
 ## [v0.3.0] - 2026-07-28
 
 ### 📚 文档

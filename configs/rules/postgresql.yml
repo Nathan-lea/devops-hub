@@ -1,0 +1,90 @@
+# PostgreSQL 告警规则
+groups:
+  - name: postgresql_alerts
+    rules:
+      # PostgreSQL 实例宕机
+      - alert: PostgresqlDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "PostgreSQL {{ $labels.host }} 宕机"
+          description: "PostgreSQL 实例已离线，exporter 无法连接数据库"
+
+      # 流复制延迟过大（> 1GB）
+      - alert: PostgresqlReplicationLag
+        expr: pg_stat_replication_pg_wal_lsn_diff > 1073741824
+        for: 2m
+        labels:
+          severity: major
+          team: dba
+        annotations:
+          summary: "PostgreSQL {{ $labels.host }} 流复制延迟过大"
+          description: "备库 WAL 延迟 {{ $value }} 字节（> 1GB），请检查网络与备库负载"
+
+      # 连接数过高（> 最大连接数 80%）
+      - alert: PostgresqlTooManyConnections
+        expr: sum by (host) (pg_stat_activity_count) / max by (host) (pg_settings_max_connections) > 0.8
+        for: 2m
+        labels:
+          severity: major
+          team: dba
+        annotations:
+          summary: "PostgreSQL {{ $labels.host }} 连接数过高"
+          description: "当前连接数超过最大限制的 80%，请检查连接池配置"
+
+      # 事务回滚率过高（> 10%）
+      - alert: PostgresqlHighRollbackRate
+        expr: rate(pg_stat_database_xact_rollback[5m]) / (rate(pg_stat_database_xact_commit[5m]) + rate(pg_stat_database_xact_rollback[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: minor
+          team: dba
+        annotations:
+          summary: "PostgreSQL {{ $labels.host }} 事务回滚率过高"
+          description: "回滚率 > 10%，可能存在应用异常或死锁"
+
+      # 长事务 / idle in transaction（持锁不释放）
+      - alert: PostgresqlIdleInTransaction
+        expr: pg_stat_activity_count{state="idle in transaction"} > 10
+        for: 5m
+        labels:
+          severity: major
+          team: dba
+        annotations:
+          summary: "PostgreSQL {{ $labels.host }} idle in transaction 过多"
+          description: "存在 {{ $value }} 个空闲事务会话，长期持有锁将阻塞其他事务"
+
+      # 缓冲池（shared_buffers）命中率低
+      - alert: PostgresqlLowCacheHitRate
+        expr: rate(pg_stat_database_blks_hit[5m]) / (rate(pg_stat_database_blks_hit[5m]) + rate(pg_stat_database_blks_read[5m])) < 0.95
+        for: 10m
+        labels:
+          severity: minor
+          team: dba
+        annotations:
+          summary: "PostgreSQL {{ $labels.host }} 缓冲池命中率低"
+          description: "命中率 < 95%，建议调大 shared_buffers 或优化查询"
+
+      # 死锁发生
+      - alert: PostgresqlDeadlocks
+        expr: increase(pg_stat_database_deadlocks[5m]) > 0
+        labels:
+          severity: minor
+          team: dba
+        annotations:
+          summary: "PostgreSQL {{ $labels.host }} 发生死锁"
+          description: "5 分钟内发生 {{ $value }} 次死锁，请排查并发事务加锁顺序"
+
+      # 临时文件使用量过大（排序/哈希溢出到磁盘）
+      - alert: PostgresqlHighTempBytes
+        expr: increase(pg_stat_database_temp_bytes[5m]) > 1073741824
+        for: 5m
+        labels:
+          severity: minor
+          team: dba
+        annotations:
+          summary: "PostgreSQL {{ $labels.host }} 临时文件使用量过大"
+          description: "5 分钟内临时文件 > 1GB，建议调大 work_mem 或优化排序查询"

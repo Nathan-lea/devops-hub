@@ -14,6 +14,7 @@ rule_files:
   - "rules/host.yml"
   - "rules/mysql.yml"
   - "rules/redis.yml"
+  - "rules/postgresql.yml"
   - "rules/k8s.yml"
   - "rules/network.yml"
   - "rules/security.yml"
@@ -76,6 +77,15 @@ scrape_configs:
   - job_name: "redis"
     file_sd_configs:
       - files: ["targets/redis.yml"]
+
+  # ============ PostgreSQL (postgres_exporter) ============
+  - job_name: "postgresql"
+    file_sd_configs:
+      - files: ["targets/postgresql.yml"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: host
+        regex: "([^:]+):.*"
 
   # ============ Nginx ============
   - job_name: "nginx"
