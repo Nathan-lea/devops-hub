@@ -9,7 +9,7 @@ devops-hub/
 ├── docs/        # 14 篇编号文档（00 总览 → 12 方法论）+ README
 ├── configs/     # 声明式配置：rules/、targets/、grafana/、k8s/、wazuh/
 ├── playbooks/   # Ansible：ansible.cfg、inventory、编号 *.yml、templates/
-└── scripts/     # 可执行 bash 脚本（备份、巡检、入侵检测）
+└── scripts/     # 可执行 bash 脚本（备份、巡检、入侵检测、迁移）
 ```
 
 文档按领域编号（`00-` 总览、`01-` 监控 … `10-` 路线图、`11-` 入侵检测、`12-` 方法论）。新增文档须使用下一个序号，并在 `docs/README.md` 与 `00-` 导航表中登记。
