@@ -23,13 +23,14 @@
 | [12-方法论与设计原则](12-方法论与设计原则.md) | 方法论与设计原则：思想/原理/原则/方法/标准/步骤、落地映射、项目模板复用、自检清单 |
 | [13-Git钩子与分支保护](13-Git钩子与分支保护.md) | 本地 Git 钩子（pre-commit/pre-push）+ Gitea 分支保护规则、CI 状态检查 |
 | [14-技能矩阵与能力评估](14-技能矩阵与能力评估.md) | 十一大技能域矩阵、五级能力评估、角色技能映射、缺口建设、复用自检 |
-| [migration/](migration/README.md) | 数据库/K8s/Web 迁移 SOP、灰度切换、数据校验、回滚预案（独立专题目录） |
+| [15-迁移方案索引](15-迁移方案索引.md) | 迁移专题入口：SOP 导航、配套脚本、使用方法（详见 `migration/` 子目录） |
+| [16-多客户差异化运维方案](16-多客户差异化运维方案.md) | 多客户 Profile 体系、三层 Inventory、监控/告警/安全/备份差异化、SOP |
 
 ## 目录结构
 
 ```
 devops-hub/
-├── docs/                           # 方案文档（17 篇）
+├── docs/                           # 方案文档（18 篇）
 │   ├── 00-总体架构与方案概览.md
 │   ├── 01-监控体系方案.md
 │   ├── 02-日志管理方案.md
@@ -45,6 +46,8 @@ devops-hub/
 │   ├── 12-方法论与设计原则.md
 │   ├── 13-Git钩子与分支保护.md
 │   ├── 14-技能矩阵与能力评估.md
+│   ├── 15-迁移方案索引.md
+│   ├── 16-多客户差异化运维方案.md
 │   ├── migration/                    # 迁移专题（独立 SOP 文档）
 │   │   ├── README.md
 │   │   ├── 00-迁移总则与方法论.md
@@ -59,6 +62,7 @@ devops-hub/
 ├── configs/                        # 配置文件
 │   ├── prometheus.yml              # Prometheus 主配置
 │   ├── alertmanager.yml           # 告警路由（4级 + 抑制）
+│   ├── alertmanager_multi_customer.yml  # 多客户告警路由（按 customer 分流）
 │   ├── promtail.yml               # 日志采集
 │   ├── blackbox.yml               # 探活配置
 │   ├── docker-compose-monitoring.yml  # 监控平台一键部署
@@ -70,6 +74,9 @@ devops-hub/
 │   │   ├── k8s.yml                # K8s 告警
 │   │   ├── network.yml            # 网络探活告警
 │   │   └── security.yml           # 安全告警（入侵/异常连接/暴力破解/容器安全/审计）
+│   ├── customer-profiles/        # 客户运维 Profile（差异化配置源）
+│   │   ├── EXAMPLE-customer.yml
+│   │   └── README.md
 │   ├── targets/                   # Prometheus 采集目标
 │   │   ├── nodes.yml
 │   │   ├── mysql.yml
@@ -88,7 +95,12 @@ devops-hub/
 │       └── pod-security.yaml
 ├── playbooks/                     # Ansible Playbook
 │   ├── ansible.cfg
+│   ├── group_vars/                    # 客户级变量（自动加载）
+│   │   ├── customer_acme/vars.yml
+│   │   ├── customer_globex/vars.yml
+│   │   └── customer_initech/vars.yml
 │   ├── inventory_example.ini
+│   ├── inventory_multi_customer_example.ini  # 多客户 Inventory（三层分组）
 │   ├── 00-init-host.yml           # 新机初始化
 │   ├── 01-system-baseline.yml     # 安全基线加固
 │   ├── 02-mysql-maintenance.yml   # MySQL 运维

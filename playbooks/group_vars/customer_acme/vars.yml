@@ -1,0 +1,69 @@
+# ============================================================
+# Ansible group_vars - 客户 A: acme (premium SLA)
+# ============================================================
+# 自动加载：inventory 中 [customer_acme] 组的主机执行 Playbook 时
+#           Ansible 自动读取本文件变量，覆盖 group_vars/all 默认值。
+# 数据来源：configs/customer-profiles/acme.yml（客户 Profile）
+# ============================================================
+
+# ---- 客户标识 ----
+customer_id: "acme"
+customer_name: "Acme 科技有限公司"
+sla_level: "premium"
+
+# ---- 监控阈值覆盖 ----
+monitoring_scrape_interval: "10s"
+monitoring_cpu_critical: 90
+monitoring_cpu_warning: 75
+monitoring_disk_critical: 85
+monitoring_mem_warning: 80
+monitoring_mysql_connection_pct: 70
+monitoring_mysql_repl_lag: 60
+
+# ---- 告警路由 ----
+alerting_webhook_url: "http://10.0.0.15:5001/webhook/acme"
+alerting_email_to: "ops@acme.com"
+alerting_phone_enabled: true
+alerting_phone_numbers:
+  - "138xxxx0001"
+  - "138xxxx0002"
+
+# ---- 安全基线 ----
+security_baseline_level: "cis-l2"
+security_firewall_policy: "strict"
+security_waf_enabled: true
+security_hids_enabled: true
+security_log_retention_days: 365
+security_compliance:
+  - "等保三级"
+
+# ---- 备份策略 ----
+backup_retention_daily: 30
+backup_retention_weekly: 12
+backup_retention_monthly: 24
+backup_frequency_full: "daily"
+backup_frequency_incremental: "every-6h"
+backup_offsite_enabled: true
+backup_offsite_region: "cn-beijing"
+backup_encryption: true
+
+# ---- 变更窗口 ----
+change_window_regular: "周六 00:00-04:00"
+change_window_major: "周六 00:00-04:00"
+change_window_blackout:
+  - "周一至周五 09:00-18:00"
+  - "每月 25-28 日"
+change_emergency: "approval_required"
+
+# ---- 访问控制 ----
+ssh_access_mode: "bastion_only"
+bastion_host: "jumpserver"
+root_login: false
+audit_enabled: true
+audit_retention_days: 365
+
+# ---- 报告 ----
+report_monthly: true
+report_recipients:
+  - "manager@acme.com"
+  - "ops@acme.com"

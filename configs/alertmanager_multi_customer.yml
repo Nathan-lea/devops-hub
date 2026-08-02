@@ -1,0 +1,270 @@
+# ============================================================
+# Alertmanager 多客户告警路由配置
+# ============================================================
+# 适用场景：纳管多个客户、各客户告警接收渠道/阈值/静默策略不同。
+# 工作原理：Prometheus 采集目标带 customer 标签 -> 告警继承该标签
+#           -> Alertmanager 按 customer 标签 matchers 路由到各自接收者。
+# 部署方式：将本文件替换 configs/alertmanager.yml，或通过 -config.file 指定。
+# 扩展客户：参照下方 acme/globex/initech 模式，新增 customer_<id>_* 路由与
+#           对应 receiver 即可。
+# ============================================================
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: "smtp.example.com:587"
+  smtp_from: "alert@example.com"
+  smtp_auth_username: "alert@example.com"
+  smtp_auth_password: "YOUR_SMTP_PASS"
+
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+
+# ---- 路由规则 ----
+# 设计要点：
+#   1. group_by 加入 "customer"，确保不同客户告警不混在一组
+#   2. 第一级子路由按 customer 分流，每个客户内部再按 severity 分级
+#   3. continue: false 确保告警命中后不再向下游传播
+#   4. 未匹配到任何客户的告警走 default 兜底
+route:
+  group_by: ["alertname", "host", "cluster", "customer"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: "default"
+  routes:
+    # ============================================================
+    # 客户 A: acme (premium SLA)
+    #   - Critical: 电话 + webhook + email
+    #   - Major:    webhook + email
+    #   - Minor:    email
+    # ============================================================
+    - matchers:
+        - customer = "acme"
+      receiver: "acme-default"
+      routes:
+        - matchers:
+            - customer = "acme"
+            - severity = "critical"
+          receiver: "acme-critical"
+          group_wait: 0s
+          repeat_interval: 1h
+          continue: false
+        - matchers:
+            - customer = "acme"
+            - severity = "major"
+          receiver: "acme-major"
+          group_wait: 30s
+          repeat_interval: 2h
+          continue: false
+        - matchers:
+            - customer = "acme"
+            - severity =~ "minor|warning"
+          receiver: "acme-minor"
+          group_wait: 1m
+          repeat_interval: 6h
+          continue: false
+      continue: false
+
+    # ============================================================
+    # 客户 B: globex (standard SLA)
+    #   - Critical: webhook + email
+    #   - Major:    webhook + email
+    #   - Minor:    email
+    # ============================================================
+    - matchers:
+        - customer = "globex"
+      receiver: "globex-default"
+      routes:
+        - matchers:
+            - customer = "globex"
+            - severity = "critical"
+          receiver: "globex-critical"
+          group_wait: 0s
+          repeat_interval: 1h
+          continue: false
+        - matchers:
+            - customer = "globex"
+            - severity = "major"
+          receiver: "globex-major"
+          group_wait: 30s
+          repeat_interval: 2h
+          continue: false
+        - matchers:
+            - customer = "globex"
+            - severity =~ "minor|warning"
+          receiver: "globex-minor"
+          group_wait: 2m
+          repeat_interval: 8h
+          continue: false
+      continue: false
+
+    # ============================================================
+    # 客户 C: initech (basic SLA)
+    #   - Critical: webhook + email
+    #   - Major:    email
+    #   - Minor:    email（8h 间隔，减少噪音）
+    # ============================================================
+    - matchers:
+        - customer = "initech"
+      receiver: "initech-default"
+      routes:
+        - matchers:
+            - customer = "initech"
+            - severity = "critical"
+          receiver: "initech-critical"
+          group_wait: 0s
+          repeat_interval: 2h
+          continue: false
+        - matchers:
+            - customer = "initech"
+            - severity =~ "major|minor|warning"
+          receiver: "initech-email"
+          group_wait: 5m
+          repeat_interval: 12h
+          continue: false
+      continue: false
+
+    # ---- 全局 severity 兜底（未携带 customer 标签的告警）----
+    - matchers:
+        - severity = "critical"
+      receiver: "critical-notify"
+      group_wait: 0s
+      repeat_interval: 1h
+      continue: false
+    - matchers:
+        - severity = "major"
+      receiver: "major-notify"
+      group_wait: 30s
+      repeat_interval: 2h
+      continue: false
+    - matchers:
+        - severity =~ "minor|warning"
+      receiver: "minor-notify"
+      group_wait: 5m
+      repeat_interval: 12h
+
+# ---- 抑制规则（加入 customer 维度，避免跨客户误抑制）----
+inhibit_rules:
+  # 主机宕机时，抑制同客户同主机的其他告警
+  - source_matchers: ["alertname = \"HostDown\""]
+    target_matchers: ["host =~ \".+\""]
+    equal: ["host", "customer"]
+
+  # K8s 节点 NotReady 时，抑制同客户该节点的 Pod 告警
+  - source_matchers: ["alertname = \"KubernetesNodeNotReady\""]
+    target_matchers: ["node =~ \".+\""]
+    equal: ["node", "customer"]
+
+  # MySQL 主库宕机时，抑制同集群从库相关告警
+  - source_matchers: ["alertname = \"MysqlDown\"", "role = \"master\""]
+    target_matchers: ["role = \"slave\""]
+    equal: ["cluster", "customer"]
+
+# ---- 接收者定义 ----
+receivers:
+  # ===== 默认兜底 =====
+  - name: "default"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook"
+        send_resolved: true
+
+  # ===== 客户 A: acme (premium) =====
+  - name: "acme-default"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/acme"
+        send_resolved: true
+  - name: "acme-critical"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/acme/critical"
+        send_resolved: true
+    pagerduty_configs:
+      - service_key: "ACME_PAGERDUTY_KEY"
+        severity: critical
+    email_configs:
+      - to: "ops@acme.com"
+        headers:
+          Subject: '[ACME][P0-Critical] {{ .CommonLabels.alertname }} on {{ .CommonLabels.host }}'
+  - name: "acme-major"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/acme/major"
+        send_resolved: true
+    email_configs:
+      - to: "ops@acme.com"
+        headers:
+          Subject: '[ACME][P1-Major] {{ .CommonLabels.alertname }}'
+  - name: "acme-minor"
+    email_configs:
+      - to: "ops@acme.com"
+        headers:
+          Subject: '[ACME][P2] {{ .CommonLabels.alertname }}'
+
+  # ===== 客户 B: globex (standard) =====
+  - name: "globex-default"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/globex"
+        send_resolved: true
+  - name: "globex-critical"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/globex/critical"
+        send_resolved: true
+    email_configs:
+      - to: "ops@globex.com"
+        headers:
+          Subject: '[GLOBEX][P0-Critical] {{ .CommonLabels.alertname }} on {{ .CommonLabels.host }}'
+  - name: "globex-major"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/globex/major"
+        send_resolved: true
+    email_configs:
+      - to: "ops@globex.com"
+        headers:
+          Subject: '[GLOBEX][P1-Major] {{ .CommonLabels.alertname }}'
+  - name: "globex-minor"
+    email_configs:
+      - to: "ops@globex.com"
+        headers:
+          Subject: '[GLOBEX][P2] {{ .CommonLabels.alertname }}'
+
+  # ===== 客户 C: initech (basic) =====
+  - name: "initech-default"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/initech"
+        send_resolved: true
+  - name: "initech-critical"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/initech/critical"
+        send_resolved: true
+    email_configs:
+      - to: "ops@initech.com"
+        headers:
+          Subject: '[INITECH][P0-Critical] {{ .CommonLabels.alertname }} on {{ .CommonLabels.host }}'
+  - name: "initech-email"
+    email_configs:
+      - to: "ops@initech.com"
+        headers:
+          Subject: '[INITECH] {{ .CommonLabels.alertname }}'
+
+  # ===== 全局 severity 兜底接收者 =====
+  - name: "critical-notify"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/critical"
+        send_resolved: true
+    pagerduty_configs:
+      - service_key: "YOUR_PAGERDUTY_KEY"
+        severity: critical
+    email_configs:
+      - to: "ops-team@example.com"
+        headers:
+          Subject: '[P0-Critical] {{ .CommonLabels.alertname }}'
+  - name: "major-notify"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/major"
+        send_resolved: true
+    email_configs:
+      - to: "ops-team@example.com"
+        headers:
+          Subject: '[P1-Major] {{ .CommonLabels.alertname }}'
+  - name: "minor-notify"
+    webhook_configs:
+      - url: "http://10.0.0.15:5001/webhook/warning"
+        send_resolved: true

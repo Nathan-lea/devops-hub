@@ -1,0 +1,57 @@
+# ============================================================
+# Ansible group_vars - 客户 C: initech (basic SLA)
+# ============================================================
+
+customer_id: "initech"
+customer_name: "Initech 信息技术有限公司"
+sla_level: "basic"
+
+# ---- 监控阈值覆盖 ----
+monitoring_scrape_interval: "30s"
+monitoring_cpu_critical: 85
+monitoring_cpu_warning: 70
+monitoring_disk_critical: 90
+monitoring_mem_warning: 85
+monitoring_mysql_connection_pct: 80
+monitoring_mysql_repl_lag: 120
+
+# ---- 告警路由 ----
+alerting_webhook_url: "http://10.0.0.15:5001/webhook/initech"
+alerting_email_to: "ops@initech.com"
+alerting_phone_enabled: false
+
+# ---- 安全基线 ----
+security_baseline_level: "cis-l1"
+security_firewall_policy: "standard"
+security_waf_enabled: false
+security_hids_enabled: true
+security_log_retention_days: 90
+security_compliance: []
+
+# ---- 备份策略 ----
+backup_retention_daily: 7
+backup_retention_weekly: 4
+backup_retention_monthly: 6
+backup_frequency_full: "daily"
+backup_frequency_incremental: "daily"
+backup_offsite_enabled: false
+backup_offsite_region: ""
+backup_encryption: false
+
+# ---- 变更窗口 ----
+change_window_regular: "灵活协商"
+change_window_major: "周六 00:00-04:00"
+change_window_blackout: []
+change_emergency: "allowed"
+
+# ---- 访问控制 ----
+ssh_access_mode: "bastion_only"
+bastion_host: "jumpserver"
+root_login: false
+audit_enabled: true
+audit_retention_days: 90
+
+# ---- 报告 ----
+report_monthly: false
+report_recipients:
+  - "ops@initech.com"

@@ -1,0 +1,99 @@
+# ============================================================
+# Prometheus file_sd 目标文件 - 多客户主机列表
+# ============================================================
+# 每条 target 携带 customer 标签，告警继承该标签后由
+# alertmanager_multi_customer.yml 按 customer 路由到各自接收者。
+# 网段约定：acme=10.10.x.x  globex=10.20.x.x  initech=10.30.x.x
+# ============================================================
+
+# ============ 客户 A: acme (premium SLA) ============
+- targets:
+    - 10.10.1.11:9100
+    - 10.10.1.12:9100
+  labels:
+    customer: acme
+    env: production
+    cloud: aliyun
+    role: web
+    region: cn-east
+
+- targets:
+    - 10.10.2.10:9100
+    - 10.10.2.11:9100
+  labels:
+    customer: acme
+    env: production
+    cloud: aliyun
+    role: mysql
+    region: cn-east
+
+- targets:
+    - 10.10.5.10:9100
+  labels:
+    customer: acme
+    env: production
+    cloud: aliyun
+    role: redis
+    region: cn-east
+
+# ============ 客户 B: globex (standard SLA) ============
+- targets:
+    - 10.20.1.11:9100
+  labels:
+    customer: globex
+    env: production
+    cloud: aws
+    role: web
+    region: cn-north
+
+- targets:
+    - 10.20.2.10:9100
+    - 10.20.2.11:9100
+    - 10.20.2.12:9100
+  labels:
+    customer: globex
+    env: production
+    cloud: aws
+    role: mysql
+    region: cn-north
+
+- targets:
+    - 10.20.3.10:9100
+    - 10.20.3.11:9100
+  labels:
+    customer: globex
+    env: production
+    cloud: aws
+    role: pg
+    region: cn-north
+
+- targets:
+    - 10.20.6.10:9100
+    - 10.20.6.11:9100
+    - 10.20.6.20:9100
+    - 10.20.6.21:9100
+  labels:
+    customer: globex
+    env: production
+    cloud: aws
+    role: k8s
+    region: cn-north
+
+# ============ 客户 C: initech (basic SLA) ============
+- targets:
+    - 10.30.1.11:9100
+  labels:
+    customer: initech
+    env: production
+    cloud: onprem
+    role: web
+    region: local
+
+- targets:
+    - 10.30.2.10:9100
+  labels:
+    customer: initech
+    env: production
+    cloud: onprem
+    role: mysql
+    region: local

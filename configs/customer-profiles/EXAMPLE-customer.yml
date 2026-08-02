@@ -1,0 +1,139 @@
+# ============================================================
+# 客户运维 Profile 模板
+# ============================================================
+# 用途：定义单个客户的运维差异化配置，作为 Ansible group_vars、
+#       Prometheus 标签、Alertmanager 路由、备份策略的统一数据源。
+# 使用：复制本文件，重命名为 <customer-id>.yml（如 acme-corp.yml），
+#       按客户实际要求填写，所有占位值替换为真实值。
+# 加载：Ansible 通过 group_vars/<customer-id>/ 自动加载本文件内容
+# ============================================================
+
+# ---- 客户基本信息 ----
+customer_id: "example-corp"          # 客户标识（唯一，用于标签/分组/路由）
+customer_name: "示例科技有限公司"      # 客户全称
+sla_level: "standard"                # premium | standard | basic
+contract_start: "2026-01-01"
+contract_end: "2026-12-31"
+
+# ---- 主机范围 ----
+# 该客户包含的主机组（对应 inventory 中的 children 分组）
+host_groups:
+  - "example_mysql"
+  - "example_web"
+  - "example_redis"
+
+# ---- 监控阈值覆盖（覆盖 configs/rules/ 默认阈值）----
+monitoring:
+  # 覆盖主机告警阈值
+  host:
+    cpu_critical: 90               # 默认 85，高端客户可收紧至 90
+    cpu_warning: 75                # 默认 70
+    disk_critical: 85              # 默认 90
+    mem_warning: 80                # 默认 85
+  # 覆盖数据库告警阈值
+  database:
+    mysql_connection_pct: 70       # 默认 80，核心客户收紧
+    mysql_replication_lag: 60      # 默认 120 秒
+    pg_connection_pct: 70          # 默认 80
+  # 采集间隔（高端客户更频繁）
+  scrape_interval: "15s"           # premium 可设 10s
+
+# ---- 告警路由 ----
+alerting:
+  # 该客户的告警接收渠道
+  receivers:
+    critical:
+      - type: "webhook"
+        url: "http://10.0.0.15:5001/webhook/example-corp/critical"
+      - type: "email"
+        to: "ops@example-corp.com"
+      - type: "phone"              # premium 客户电话通知
+        numbers: ["138xxxx0001"]
+    major:
+      - type: "webhook"
+        url: "http://10.0.0.15:5001/webhook/example-corp/major"
+      - type: "email"
+        to: "ops@example-corp.com"
+    minor:
+      - type: "email"
+        to: "ops@example-corp.com"
+  # 静默窗口（客户业务低峰期允许静默 minor 告警）
+  silence_windows:
+    - start: "00:00"
+      end: "06:00"
+      severity: ["minor", "warning"]
+  # 告警抑制规则（客户特定）
+  inhibit_rules: []
+
+# ---- 安全基线 ----
+security:
+  baseline_level: "cis-l2"          # cis-l1 | cis-l2（L2 更严格）
+  firewall_policy: "strict"         # strict | standard
+  # 额外放行端口（客户应用特有）
+  allowed_ports: [8443, 9090]
+  # 禁止端口
+  blocked_ports: [23, 445]
+  # 是否启用 WAF
+  waf_enabled: true
+  # 是否启用 HIDS（Wazuh）
+  hids_enabled: true
+  # 日志保留天数（合规要求）
+  log_retention_days: 180          # 金融客户 180 天，普通客户 90 天
+  # 合规要求
+  compliance: ["等保三级"]           # ["等保二级"] / ["GDPR"] / ["等保三级","PCI-DSS"]
+
+# ---- 备份策略 ----
+backup:
+  # 保留策略（按 SLA 差异化）
+  retention:
+    daily: 14                       # 默认 7，premium 客户 14-30
+    weekly: 8                       # 默认 4
+    monthly: 12                     # 默认 6
+  # 备份频率
+  frequency:
+    full: "daily"                   # daily | every-6h
+    incremental: "every-6h"
+  # 异地备份（premium 客户要求）
+  offsite_enabled: true
+  offsite_region: "cn-beijing"
+  # 加密
+  encryption: true
+  encryption_key_ref: "vault_example_backup_key"
+
+# ---- 变更窗口 ----
+change_window:
+  regular: "周三 22:00-24:00"       # 常规变更
+  major: "周六 00:00-04:00"         # 重大变更
+  # 客户业务高峰期（禁止变更）
+  blackout_periods:
+    - "周一至周五 09:00-18:00"
+    - "每月 25-28 日（月末结算）"
+  # 是否允许紧急变更
+  emergency_change: "approval_required"  # allowed | approval_required | forbidden
+
+# ---- 访问控制 ----
+access_control:
+  # 管理该客户的运维团队成员
+  team_members:
+    - "zhang_san"                   # 主负责人
+    - "li_si"                       # 备份负责人
+  # SSH 访问方式
+  ssh_access: "bastion_only"        # direct | bastion_only
+  bastion_jump: "jumpserver"
+  # 是否允许直接 root 登录
+  root_login: false
+  # 审计要求
+  audit_enabled: true
+  audit_log_retention: 365          # 天
+
+# ---- 报告 ----
+reporting:
+  # 定期报告频率与接收人
+  monthly_report: true
+  report_recipients: ["manager@example-corp.com", "ops@example-corp.com"]
+  # 报告内容
+  include_sections:
+    - "availability"
+    - "incident_summary"
+    - "capacity_trend"
+    - "security_audit"

@@ -6,6 +6,34 @@
 
 ---
 
+## [v0.6.0] - 2026-08-02
+
+### ✨ 新功能
+- **多客户差异化运维体系**：从"单一扁平环境"升级为"默认基线 + 客户 Profile 覆盖"
+  模式，支持纳管多个 SLA 等级、告警渠道、安全基线、备份策略各异的客户。
+  - **客户 Profile 体系**（`configs/customer-profiles/`）：以客户 Profile（YAML）为
+    统一数据源，定义 8 大维度（基本信息/监控/告警/安全/备份/变更窗口/访问控制/报告），
+    驱动 group_vars、Prometheus 标签、Alertmanager 路由、备份策略差异化。
+  - **三层 Inventory 分组**（`playbooks/inventory_multi_customer_example.ini`）：
+    第一层按客户（`customer_<id>`）-> 第二层按角色（`customer_<id>_<role>`）
+    -> 第三层跨客户聚合（`role_<role>` / `<cloud>` / `<distro>`）。
+  - **多客户告警路由**（`configs/alertmanager_multi_customer.yml`）：按 `customer`
+    标签 matchers 分流到各自接收者，`group_by` 加入 `customer` 维度，抑制规则
+    加入 `customer` 防止跨客户误抑制，3 个示例客户（premium/standard/basic）。
+  - **多客户监控目标**（`configs/targets/nodes_multi_customer.yml`）：targets
+    携带 `customer` 标签，告警自动继承并路由。
+  - **group_vars 差异化**（`playbooks/group_vars/customer_*/vars.yml`）：3 个
+    示例客户（acme-premium / globex-standard / initech-basic），覆盖监控阈值、
+    安全基线、备份保留、变更窗口等差异化变量。
+  - **方案文档**（`docs/16-多客户差异化运维方案.md`）：架构设计、Profile 体系、
+    监控/告警/安全/备份/变更/访问控制差异化详解、4 项操作 SOP、落地步骤。
+
+### 📐 架构改进
+- 新增客户只需"一个 Profile + 一段 Inventory + 一段 Alertmanager 路由"，
+  80% 配置继承全局默认值，实现低门槛纳管新客户。
+- 原有单客户配置（`alertmanager.yml` / `nodes.yml`）保留不动，多客户版为
+  独立文件，可验证后切换，平滑过渡无风险。
+
 ## [v0.5.0] - 2026-07-31
 
 ### ✨ 新功能
