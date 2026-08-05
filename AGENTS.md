@@ -10,10 +10,10 @@ devops-hub/
 ├── configs/     # 声明式配置：rules/、targets/、grafana/、k8s/、wazuh/、customer-profiles/
 ├── playbooks/   # Ansible：ansible.cfg、inventory、group_vars/、编号 *.yml、templates/
 ├── scripts/     # 可执行 bash 脚本（备份、巡检、入侵检测、迁移）
-└── skills/      # 自研运维 skills（prometheus-rules-lint 等 6 个）
+└── skills/      # 自研运维 skills（6 个 + LICENSE + CONTRIBUTING，贡献指南见 docs/17）
 ```
 
-文档按领域编号（`00-` 总览、`01-` 监控 … `12-` 方法论、`13-` Git 钩子、`14-` 技能矩阵、`16-` 多客户差异化）。新增文档须使用下一个序号，并在 `docs/README.md` 与 `00-` 导航表中登记。
+文档按领域编号（`00-` 总览 … `14-` 技能矩阵、`15-` 迁移索引、`16-` 多客户、`17-` skill 贡献）。新增文档须使用下一个序号，并在 `docs/README.md` 与 `00-` 导航表中登记。
 
 ## 构建、测试与本地运行命令
 

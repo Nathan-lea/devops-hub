@@ -6,6 +6,21 @@
 
 ---
 
+## [v0.7.1] - 2026-08-06
+
+### 📄 新增文档
+- **自研 Skill 社区贡献指南**（`docs/17-自研skill社区贡献指南.md`，478 行）：
+  指导将 `skills/` 目录下的 6 个自研运维 skill 贡献到开源社区。
+  - 四大贡献渠道：skills.sh 发布 / awesome-codex-skills PR / devops-sre-skills PR / 独立仓库
+  - 贡献前置准备：泛化清单（移除项目特定路径引用）、安全检查、格式规范
+  - 每个渠道的详细操作步骤（含完整命令）
+  - 各 skill 最佳贡献渠道推荐
+  - PR 描述模板、贡献前检查清单、贡献后维护策略与双向同步机制
+
+### 🔧 新增文件
+- `skills/LICENSE`（MIT 许可证）：为 skill 社区贡献提供法律基础
+- `skills/CONTRIBUTING.md`：skill 新增/修改规范（frontmatter/safety/正文结构/禁止项）
+
 ## [v0.7.0] - 2026-08-06
 
 ### ✨ 新功能
