@@ -6,6 +6,26 @@
 
 ---
 
+## [v0.7.0] - 2026-08-06
+
+### ✨ 新功能
+- **自研运维 Skills 体系**（`skills/`，6 个 skill）：根据 `docs/14` 第 9.8.5 节
+  自研建议，为运维垂直缺口创建可被 Codex/Claude 自动加载的 skill，每个含
+  YAML frontmatter（`tools_allowed`/`safety` 契约）+ 验证步骤 + 回滚指引。
+  - `prometheus-rules-lint`：告警规则校验（YAML 语法/结构完整性/名称规范/PromQL），
+    复用 `hooks/pre-commit` 逻辑。
+  - `tidb-br-backup`：TiDB BR 备份与恢复（全量备份/校验/恢复/过期清理/监控指标），
+    复用 `scripts/tidb_backup.sh`。
+  - `wazuh-rule-tuning`：入侵检测规则调优（Wazuh/Suricata/fail2ban/Prometheus 阈值），
+    复用 `configs/rules/security.yml` + `docs/11`。
+  - `mysql-xtrabackup-verify`：MySQL 备份验证（prepare/测试恢复/行数校验/S3 校验），
+    复用 `scripts/mysql_full_backup.sh`。
+  - `pg-backup-verify`：PostgreSQL 备份验证（逻辑/物理双模式/行数+序列校验/S3 校验），
+    复用 `scripts/postgresql_backup.sh`。
+  - `migration-verify`：迁移数据一致性校验（MySQL CRC32/PG 序列/文件 rsync/go-no-go 报告），
+    复用 `scripts/migration/migration_data_verify.sh`。
+  - `skills/README.md`：skill 清单、安装方式、设计规范。
+
 ## [v0.6.0] - 2026-08-02
 
 ### ✨ 新功能
