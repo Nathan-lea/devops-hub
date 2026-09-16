@@ -23,3 +23,6 @@ secrets/
 
 # understand-anything 工具产物（可由 understand skill 重新生成）
 .understand-anything/
+
+# 本地交付概览速记（含本地部署路径，仅个人使用，勿提交）
+交付概览.dm
