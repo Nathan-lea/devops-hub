@@ -10,6 +10,7 @@ devops-hub/
 ├── configs/     # 声明式配置：rules/、targets/、grafana/、k8s/、wazuh/、customer-profiles/
 ├── playbooks/   # Ansible：ansible.cfg、inventory、group_vars/、编号 *.yml、templates/
 ├── scripts/     # 可执行 bash 脚本（备份、巡检、入侵检测、迁移）
+├── hooks/       # 本地 Git 钩子（pre-commit/pre-push，激活见下）
 └── skills/      # 自研运维 skills（6 个 + LICENSE + CONTRIBUTING，贡献指南见 docs/17）
 ```
 
@@ -17,7 +18,13 @@ devops-hub/
 
 ## 构建、测试与本地运行命令
 
-无编译步骤。提交前请执行校验：
+无编译步骤。首次克隆后先激活本地钩子（自动做语法/密钥/隐私扫描）：
+
+```bash
+git config core.hooksPath hooks
+```
+
+提交前请执行校验：
 
 ```bash
 bash -n scripts/*.sh                    # Shell 语法检查
