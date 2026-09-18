@@ -31,7 +31,7 @@ safety: read-only-tuning
 
 ```bash
 # Wazuh manager 可达
-curl -s -u wazuh:wazuh -k https://WAZUH_MANAGER:55000/agents/summary | head -5
+curl -s -u <WAZUH_API_USER>:<WAZUH_API_PASS> -k https://WAZUH_MANAGER:55000/agents/summary | head -5
 
 # Suricata 规则目录
 ls /etc/suricata/rules/ 2>/dev/null || echo "Suricata 规则目录不存在"
