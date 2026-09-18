@@ -1,0 +1,13 @@
+# Gitleaks 扫描配置：继承内置规则，仅豁免 Wazuh API 官方文档默认凭据示例。
+# 说明：`wazuh:wazuh` 是 Wazuh 官方文档公开的 API 默认账号口令（非真实密钥），
+# 且当前源码已替换为占位符 <WAZUH_API_USER>:<WAZUH_API_PASS>；
+# 此处仅允许历史提交中的该条示例，其他规则均按内置默认生效。
+title = "devops-hub gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+regexes = [
+  '''(?i)wazuh:wazuh''',
+]
