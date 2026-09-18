@@ -6,6 +6,7 @@
 #   2. YAML 文件可解析（python3 yaml.safe_load）
 #   3. 脚本文件具备可执行权限
 #   4. 疑似密钥/凭据泄露扫描
+#   4.1 本地隐私信息扫描（本机绝对路径/个人邮箱域名）——均运行时推导，不硬编码
 #   5. Playbook 语法（ansible-playbook --syntax-check，若可用）
 # 遵循 AGENTS.md 测试指南与安全提示
 # ============================================================
@@ -83,6 +84,29 @@ done)"
 if [ -n "$leak_hit" ]; then
   warn "检测到疑似密钥/凭据，请确认是否为占位符："
   printf '%s\n' "$leak_hit" >&2
+  FAIL=1
+fi
+
+# ---------- 4.1 本地隐私信息扫描（本机路径/个人邮箱） ----------
+# 全部依据运行时推导的通用标识（仓库根、$HOME、当前用户名、常见个人邮箱域名），
+# 钩子文件本身不硬编码任何真实路径与邮箱，可安全提交至公开仓库。
+info "本地隐私信息扫描（本机绝对路径/个人邮箱域名）"
+escape_re() { printf '%s' "$1" | sed 's/[][\.^$*+?{}|()]/\\&/g'; }
+LOCAL_REPO_PATH="$(realpath "$REPO_ROOT")"
+LOCAL_HOME_PATH="$(realpath "$HOME")"
+LOCAL_USER_NAME="$(basename "$HOME")"
+# 覆盖：仓库本机实际根路径、$HOME 实际路径、/home|/Users|/data 下当前用户名路径、
+#       常见个人邮箱域名、Windows 用户目录
+PRIVACY_RE="$(escape_re "$LOCAL_REPO_PATH")|$(escape_re "$LOCAL_HOME_PATH")|/home/${LOCAL_USER_NAME}/|/Users/${LOCAL_USER_NAME}/|/data/${LOCAL_USER_NAME}([/[:space:]]|$)|[A-Za-z0-9._%+-]+@(sina|qq|163|126|139|gmail|outlook|foxmail)\.com|C:(\\|/)Users/"
+privacy_hit="$(printf '%s\n' "$STAGED" | while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] || continue
+  case "$f" in hooks/*|.gitignore) continue;; esac
+  grep -nE "$PRIVACY_RE" "$f" 2>/dev/null
+done)"
+if [ -n "$privacy_hit" ]; then
+  warn "检测到疑似本机隐私信息（真实路径或个人邮箱），请替换为占位符（如 /opt/app、<example.com>）或移出版本控制："
+  printf '%s\n' "$privacy_hit" >&2
   FAIL=1
 fi
 
