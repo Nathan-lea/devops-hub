@@ -28,7 +28,7 @@ git config core.hooksPath hooks
 
 ```bash
 bash -n scripts/*.sh                    # Shell 语法检查
-python3 -c "import yaml,glob;[yaml.safe_load(open(f)) for f in glob.glob('configs/**/*.y*ml',recursive=True)+glob.glob('playbooks/*.yml')]"
+python3 -c "import yaml,glob;[list(yaml.safe_load_all(open(f))) for f in glob.glob('configs/**/*.y*ml',recursive=True)+glob.glob('playbooks/*.yml')]"
 chmod +x scripts/*.sh                   # 保证脚本可执行
 ansible-playbook playbooks/00-init-host.yml --syntax-check   # Playbook 语法检查
 ```

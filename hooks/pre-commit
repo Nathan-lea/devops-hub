@@ -3,7 +3,7 @@
 # pre-commit 钩子：提交前自动校验
 # 检查项：
 #   1. Shell 脚本语法（bash -n）+ shellcheck（若可用）
-#   2. YAML 文件可解析（python3 yaml.safe_load）
+#   2. YAML 文件可解析（python3 yaml.safe_load_all，兼容多文档）
 #   3. 脚本文件具备可执行权限
 #   4. 疑似密钥/凭据泄露扫描
 #   4.1 本地隐私信息扫描（本机绝对路径/个人邮箱域名）——均运行时推导，不硬编码
@@ -46,10 +46,10 @@ fi
 # ---------- 2. YAML 校验 ----------
 yaml_files="$(printf '%s\n' "$STAGED" | grep -E '\.(ya?ml)$' || true)"
 if [ -n "$yaml_files" ]; then
-  info "YAML 文件解析检查（yaml.safe_load）"
+  info "YAML 文件解析检查（yaml.safe_load_all，支持多文档）"
   while IFS= read -r f; do
     [ -z "$f" ] && continue
-    if ! python3 -c "import sys,yaml; yaml.safe_load(open(sys.argv[1]))" "$f" 2>/dev/null; then
+    if ! python3 -c "import sys,yaml; list(yaml.safe_load_all(open(sys.argv[1])))" "$f" 2>/dev/null; then
       warn "YAML 解析失败：$f"
       FAIL=1
     fi

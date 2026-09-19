@@ -37,7 +37,7 @@ git config core.hooksPath hooks   # 激活提交前自动校验（语法/密钥/
 
 ```bash
 bash -n scripts/*.sh
-python3 -c "import yaml,glob;[yaml.safe_load(open(f)) for f in glob.glob('configs/**/*.y*ml',recursive=True)+glob.glob('playbooks/*.yml')]"
+python3 -c "import yaml,glob;[list(yaml.safe_load_all(open(f))) for f in glob.glob('configs/**/*.y*ml',recursive=True)+glob.glob('playbooks/*.yml')]"
 ```
 
 ## 约定与安全

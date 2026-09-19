@@ -25,4 +25,5 @@ jobs:
 
       - name: YAML 解析检查
         run: |
-          python3 -c "import yaml,glob;[yaml.safe_load(open(f)) for f in glob.glob('configs/**/*.y*ml',recursive=True)+glob.glob('playbooks/*.yml')]"
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml
+          python3 -c "import yaml,glob,os;[list(yaml.safe_load_all(open(f))) for f in glob.glob('configs/**/*.y*ml',recursive=True)+glob.glob('playbooks/*.yml')]"
